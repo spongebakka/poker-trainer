@@ -1,0 +1,8 @@
+{
+  "name": "felt-poker-trainer",
+  "private": true,
+  "scripts": {
+    "test": "node test/engine-check.js",
+    "build-data": "node tools/precompute.js 12000"
+  }
+}
