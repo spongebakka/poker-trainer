@@ -1,6 +1,6 @@
 // Offline cache. Bump VERSION whenever a file below changes, so phones pick up the new build.
-const VERSION = "felt-1";
-const FILES = ["./", "index.html", "fonts.css", "style.css", "engine.js", "data.js", "app.js",
+const VERSION = "felt-2";
+const FILES = ["./", "index.html", "fonts.css", "style.css", "engine.js", "data.js", "table.js", "app.js",
   "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", e => {

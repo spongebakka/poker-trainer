@@ -1,6 +1,8 @@
 # Felt: poker, learned at the table
 
-A play-first poker trainer: 13 drills in three acts (the game → cash games →
+A play-first poker trainer. **The table** (`#/lobby`) is the core: full No-Limit
+Hold'em hands against five bots, cash game or tournament, with a coach that checks
+every decision. Around it sit 13 practice drills in three acts (the game → cash games →
 tournaments). Every drill is something you do on a felt table: tap cards, tap
 seats, paint ranges, slide a chip. Every answer gets a "why" with real numbers.
 No network, no build step, no dependencies.
@@ -28,11 +30,22 @@ rendered to PNG with headless Chrome + `sips`.
 - `data.js`: **generated**, do not edit. 169×169 preflop equity matrix (12,000 run-outs
   per matchup), blocker-aware combo weights, and heads-up push/fold Nash charts for
   1–20 and 25 bb (fictitious play, 600 iterations). Rebuild: `npm run build-data` (~1 min).
-- `app.js`: UI shell + the 13 drills. Each drill is one `def({...})` block with an
+- `table.js`: the coached table, no DOM. Hand engine (blinds, big-blind ante, betting,
+  min-raise rules, uncalled-bet refunds, side pots, showdown, tournament places), bots,
+  and the coach. **Key idea:** a bot's strategy is a pure function of (cards, situation),
+  with "random" mixing done by hashing the cards, so after every bot action the engine
+  re-runs that strategy over all 1,326 combos and keeps the ones that would have acted
+  the same way. That gives the coach the bot's *exact* range, which it uses for equity
+  (Monte Carlo) and, for bet-or-check spots, real EV against the bot's actual responses.
+  Grading: first try wrong → hint + second go (only the first try counts toward stats).
+- `app.js`: UI shell + the 13 drills + the table screen (lobby, table, coach panel). Each drill is one `def({...})` block with an
   `idea` (the teaching text) and `run(ctx)` (deal a spot, grade it, explain it).
 - `style.css`, `fonts.css`: look and feel. Fonts are embedded (same three as the
   blackjack trainer) so it works offline.
-- `test/engine-check.js`: `npm test`. 480 checks: hand ranking edge cases, equity vs
+- `test/table-check.js`: simulates 30 tournaments + 2,000 cash hands of bots: chips
+  conserved every hand, each bot's real cards always inside its tracked range, places
+  1–6, side pots, hand-reading tiers, coach sanity (AA under the gun raises, 72o folds).
+- `test/engine-check.js`: `npm test` runs both. 480 checks: hand ranking edge cases, equity vs
   published matchups, Nash sanity (AA always shoves, range shrinks with stack,
   ~58% at 10 bb), ICM properties.
 
@@ -46,12 +59,20 @@ rendered to PNG with headless Chrome + `sips`.
 | Push or fold, Call the shove | the Nash tables in data.js (heads-up / blind vs blind, no antes) |
 | Bubble maths | ICM on the actual stacks; opponent range = top X% by equity vs a random hand |
 
+## How good are the bots?
+Six styles with real names for them (nit, TAG, LAG, calling station). Measured over
+6,000 cash hands from the hero seat: the solid (TAG) style wins about +10 bb/100, always
+calling loses ~900 bb/100, always going all in ~700 bb/100, always pot-betting postflop
+~−20 bb/100. So they reward good play and punish the obvious exploits. Known
+simplifications: preflop charts are 6-max simplified, short-stack shove ranges are
+heads-up Nash shrunk per player behind, postflop EV counts the current street only.
+
 ## Mastery
 "Solid" = 18 of the last 20 right. Nothing is locked; the home screen points at the
 first drill that isn't solid yet.
 
 ## Ideas not built yet
-- A live table: play full hands against bots with a coach flagging each decision.
+- Table: hand history replay; spaced review that re-deals spots you got wrong; 9-handed tables.
 - Antes in push/fold (modern tournaments use a big-blind ante, which widens shoves).
 - 3-betting and facing a raise; postflop c-bet spots.
 - Spaced repetition across drills (the blackjack trainer has an FSRS layer to borrow).
