@@ -13,6 +13,14 @@ then open http://127.0.0.1:8766/index.html. Progress saves in the browser
 (`localStorage`, key `felt_v1`). Keyboard on desktop: the letter on each button,
 Enter for next, Esc for home.
 
+## On your phone
+It's a PWA: `manifest.webmanifest` + `icons/` make it installable, and `sw.js` caches
+every file so it runs with no signal. Repo: github.com/spongebakka/poker-trainer
+(private, `main`). Netlify auto-deploys each push to `main` (`netlify.toml` publishes
+the folder as-is, no build). **When you change any app file, bump `VERSION` in `sw.js`**
+so installed copies refresh their cache. The icon is drawn in `tools/icon.html` and
+rendered to PNG with headless Chrome + `sips`.
+
 ## Files
 - `engine.js`: hand evaluator (7-card), 169 hand classes, range parsing, Monte Carlo
   equity, ICM (Malmuth-Harville). Shared by the browser and Node.
