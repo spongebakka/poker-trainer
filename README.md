@@ -15,9 +15,10 @@ Enter for next, Esc for home.
 
 ## On your phone
 It's a PWA: `manifest.webmanifest` + `icons/` make it installable, and `sw.js` caches
-every file so it runs with no signal. Repo: github.com/spongebakka/poker-trainer
-(private, `main`). Netlify auto-deploys each push to `main` (`netlify.toml` publishes
-the folder as-is, no build). **When you change any app file, bump `VERSION` in `sw.js`**
+every file so it runs with no signal. Live at https://spongebakka.github.io/poker-trainer/ via GitHub
+Pages (repo spongebakka/poker-trainer, **public**, branch `main`, root folder). Each
+push to `main` redeploys in about a minute. Commits use the GitHub no-reply email
+(set in this repo's git config) so Kai's address stays off the public history. **When you change any app file, bump `VERSION` in `sw.js`**
 so installed copies refresh their cache. The icon is drawn in `tools/icon.html` and
 rendered to PNG with headless Chrome + `sips`.
 
