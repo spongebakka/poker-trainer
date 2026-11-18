@@ -38,6 +38,11 @@ rendered to PNG with headless Chrome + `sips`.
   the same way. That gives the coach the bot's *exact* range, which it uses for equity
   (Monte Carlo) and, for bet-or-check spots, real EV against the bot's actual responses.
   Grading: first try wrong → hint + second go (only the first try counts toward stats).
+- `coach.js`: logs every table decision, hand, drill answer and flag (with "I'm guessing" and think
+  time) to an outbox in localStorage (key `felt_coach_v1`), uploads it to the **private** repo
+  spongebakka/felt-data with a fine-grained token Kai pastes in at `#/sync`, and pulls
+  `coach/plan.json` + `coach/replies.json` back. Its `APP` must equal `VERSION` in sw.js (tested).
+  Full spec: `docs/COACHING.md`. Coaching sessions: `node tools/review.js ../felt-data`.
 - `app.js`: UI shell + the 13 drills + the table screen (lobby, table, coach panel). Each drill is one `def({...})` block with an
   `idea` (the teaching text) and `run(ctx)` (deal a spot, grade it, explain it).
 - `style.css`, `fonts.css`: look and feel. Fonts are embedded (same three as the

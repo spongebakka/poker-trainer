@@ -244,7 +244,7 @@
         else if (!dc) lines.push(`${CAT_NAME[PE.category(Math.max(q.sa, q.sb))]} beats ${CAT_NAME[PE.category(Math.min(q.sa, q.sb))].toLowerCase()}.`);
         else if (dc.index === 0) lines.push(`Same hand type, so the higher one wins: ${RANK_PLURAL[Math.max(dc.a, dc.b)].toLowerCase()} beat ${RANK_PLURAL[Math.min(dc.a, dc.b)].toLowerCase()}.`);
         else lines.push(`Settled by the ${["", "second", "third", "fourth", "fifth"][dc.index]} card: a ${PE.RANK_NAME[Math.max(dc.a, dc.b)].toLowerCase()} beats a ${PE.RANK_NAME[Math.min(dc.a, dc.b)].toLowerCase()}. That's the <b>kicker</b>.`);
-        ctx.finish({ grade: ans === truth ? "ok" : "no", lines });
+        ctx.finish({ log: { pick: ans, truth }, grade: ans === truth ? "ok" : "no", lines });
       };
       ctx.buttons([["A wins", () => answer("A"), "a"], ["Split", () => answer("S"), "s", "mid"], ["B wins", () => answer("B"), "b"]]);
     },
@@ -335,7 +335,7 @@
         if (!ok) lines.push(`You tapped the <b>${POS_NAME[got].toLowerCase()}</b>. The answer was the <b>${POS_NAME[want].toLowerCase()}</b>.`);
         lines.push(SEAT_FACT[want]);
         lines.push(`From the button, going left: <span class="m">BTN → SB → BB → UTG → HJ → CO</span>`);
-        ctx.finish({ grade: ok ? "ok" : "no", lines });
+        ctx.finish({ log: { asked: want, tapped: got }, grade: ok ? "ok" : "no", lines });
       }
     },
   });
@@ -375,7 +375,7 @@
           `The ${pos} opens <span class="m">${P(PE.rangePct(set) / 100)}</span> of hands, about 1 in ${Math.round(100 / PE.rangePct(set))}.`,
         ];
         const extra = h("div", {}, gridEl(i => set.has(i) ? "in" : "", { me: cls }), h("div", { class: "gridkey", html: `<span><i style="background:var(--brass)"></i>${pos} opens</span><span>□ outlined: your hand</span>` }));
-        ctx.finish({ grade: ok ? "ok" : "no", lines, extra });
+        ctx.finish({ log: { hand: CLASSES[cls].name, pos, chose: raise ? "raise" : "fold", right: truth ? "raise" : "fold" }, grade: ok ? "ok" : "no", lines, extra });
       };
       ctx.buttons([["Fold", () => answer(false), "f", "fold"], [pos === "SB" ? "Raise 3bb" : "Raise 2.5bb", () => answer(true), "r"]]);
     },
@@ -416,7 +416,7 @@
         });
         const lines = [`Overlap: <span class="m">${P(score)}</span>. ${miss ? `${miss} hand${miss > 1 ? "s" : ""} missed (outlined)` : "Nothing missed"}, ${extra ? `${extra} extra (red)` : "nothing extra"}.`];
         lines.push(WHY_POS[pos]);
-        ctx.finish({ grade: ok ? "ok" : score >= 0.8 ? "mid" : "no", lines, okCounts: ok, verdict: ok ? null : score >= 0.8 ? "Close." : null });
+        ctx.finish({ log: { pos, overlap: +score.toFixed(3), missed: miss, extra }, grade: ok ? "ok" : score >= 0.8 ? "mid" : "no", lines, okCounts: ok, verdict: ok ? null : score >= 0.8 ? "Close." : null });
       }, "enter"]]);
     },
   });
@@ -468,7 +468,7 @@
           archetype(a, b),
         ];
         const extra = meter([[CLASSES[a].name, truth], [CLASSES[b].name, 1 - truth, "var(--tx4)"]]);
-        ctx.finish({ grade: err <= 0.07 ? "ok" : "no", lines, extra });
+        ctx.finish({ log: { a: CLASSES[a].name, b: CLASSES[b].name, guess: g, truth: +truth.toFixed(3) }, grade: err <= 0.07 ? "ok" : "no", lines, extra });
       }, "enter"]]);
     },
   });
@@ -511,7 +511,7 @@
         if (!ok) lines.push(`You found ${hit} of ${q.outs.length}${wrong ? `, plus ${wrong} that don't win` : ""}. Missed outs pulse; wrong picks are red.`);
         if (q.dirty.length) { const d = q.dirty[0]; lines.push(`Dirty out: the <span class="m">${cardTxt(d.c)}</span> gives you ${PE.describe(d.hero).replace(/^./, m => m.toLowerCase())} but gives them ${PE.describe(d.vil).replace(/^./, m => m.toLowerCase())}.`); }
         if (q.ties.length) lines.push(`${q.ties.length === 1 ? "One card splits" : q.ties.length + " cards split"} the pot (<span class="m">${cardsTxt(q.ties.slice(0, 6))}</span>). Not an out.`);
-        ctx.finish({ grade: ok ? "ok" : "no", lines, note: `Rule of 2: ${q.outs.length} outs × 2 ≈ ${q.outs.length * 2}% to hit. Exactly ${q.outs.length}/44 = ${P(q.outs.length / 44)} here.` });
+        ctx.finish({ log: { outs: q.outs.length, found: hit, wrong }, grade: ok ? "ok" : "no", lines, note: `Rule of 2: ${q.outs.length} outs × 2 ≈ ${q.outs.length * 2}% to hit. Exactly ${q.outs.length}/44 = ${P(q.outs.length / 44)} here.` });
       }, "enter"]]);
     },
   });
@@ -545,7 +545,7 @@
             `${truth ? "Calling" : "Calling here"} ${ev >= 0 ? "wins" : "loses"} about <span class="m">${Math.abs(ev).toFixed(1)}</span> chips each time on average.`,
         ];
         const extra = meter([["You need", need, "var(--tx3)"], ["You have", have, have >= need ? "var(--ok)" : "var(--no)"]]);
-        ctx.finish({ grade: close || call === truth ? "ok" : "no", lines, extra, verdict: close ? "Either works." : null });
+        ctx.finish({ log: { pot, bet, need: +need.toFixed(3), have: +have.toFixed(3), chose: call ? "call" : "fold", right: close ? "either" : truth ? "call" : "fold" }, grade: close || call === truth ? "ok" : "no", lines, extra, verdict: close ? "Either works." : null });
       };
       ctx.buttons([["Fold", () => answer(false), "f", "fold"], ["Call " + bet, () => answer(true), "c"]]);
     },
@@ -580,7 +580,7 @@
           `They risk <span class="m">${bet}</span> to win <span class="m">${pot}</span>. Keep going with ${pot} ÷ (${pot} + ${bet}) = <b>${P(truth)}</b> of your range.`,
           `Fold more than ${P(1 - truth)} and they can bet any two cards for profit. You said ${P(g)}.`,
         ];
-        ctx.finish({ grade: err <= 0.05 ? "ok" : "no", lines, note: "Bigger bets need more folds to work, and let the defender fold more." });
+        ctx.finish({ log: { type, bet, pot, guess: g, truth: +truth.toFixed(3) }, grade: err <= 0.05 ? "ok" : "no", lines, note: "Bigger bets need more folds to work, and let the defender fold more." });
       }, "enter"]]);
     },
   });
@@ -618,7 +618,7 @@
         const lines = [`${fmt(stack)} ÷ ${fmt(bb)} = <b>${truth} big blinds</b>.`];
         if (n === Math.round(stack / sb) && n !== truth) lines.push("That answer divided by the small blind. Always use the big one.");
         lines.push(`<b>${zn}.</b> ${zt}`);
-        ctx.finish({ grade: n === truth ? "ok" : "no", lines, keepCtl: true });
+        ctx.finish({ log: { stack, bb, answer: n, truth }, grade: n === truth ? "ok" : "no", lines, keepCtl: true });
       }
     },
   });
@@ -653,7 +653,7 @@
           `Folding costs your ½ bb. Shoving wins 1.5 bb right away whenever they fold, and the shorter you are, the less a call hurts you and the more they need a real hand to call.`,
         ];
         const extra = h("div", {}, gridEl(i => w[i] >= 0.5 ? "in" : w[i] > 0.15 ? "f1" : "", { me: cls }), h("div", { class: "gridkey", html: `<span><i style="background:var(--brass)"></i>shove at ${S} bb</span><span><i style="background:rgba(201,164,90,.35)"></i>sometimes</span>` }));
-        ctx.finish({ grade: ok ? "ok" : "no", lines, extra, verdict: mixed ? "Either works." : null });
+        ctx.finish({ log: { hand: CLASSES[cls].name, bb: S, chose: shove ? "shove" : "fold", right: mixed ? "either" : truth ? "shove" : "fold" }, grade: ok ? "ok" : "no", lines, extra, verdict: mixed ? "Either works." : null });
       };
       ctx.buttons([["Fold", () => answer(false), "f", "fold"], ["All in", () => answer(true), "a"]]);
     },
@@ -685,7 +685,7 @@
         ];
         const extra = h("div", {}, meter([["You need", need, "var(--tx3)"], ["You have", eq, eq >= need ? "var(--ok)" : "var(--no)"]]),
           gridEl(i => cw[i] >= 0.5 ? "in" : cw[i] > 0.15 ? "f1" : "", { me: cls }), h("div", { class: "gridkey", html: `<span><i style="background:var(--brass)"></i>call a ${S} bb shove</span>` }));
-        ctx.finish({ grade: ok ? "ok" : "no", lines, extra, verdict: mixed ? "Either works." : null });
+        ctx.finish({ log: { hand: CLASSES[cls].name, bb: S, chose: call ? "call" : "fold", right: mixed ? "either" : truth ? "call" : "fold", eq: +eq.toFixed(3), need: +need.toFixed(3) }, grade: ok ? "ok" : "no", lines, extra, verdict: mixed ? "Either works." : null });
       };
       ctx.buttons([["Fold", () => answer(false), "f", "fold"], ["Call", () => answer(true), "c"]]);
     },
@@ -722,7 +722,7 @@
           const g = +rng.value / 100, err = Math.abs(g - truth); rng.disabled = true;
           const lines = [`ICM says <b>${P(truth, 1)}</b> of the prize pool, for ${P(st[0] / 20000, 1)} of the chips. You said ${P(g)}.`,
             st[0] / 20000 > truth ? "Big stacks are worth <b>less</b> than their chips: you can only win first place once." : "Short stacks are worth <b>more</b> than their chips: everyone who survives the bubble gets paid, however small."];
-          ctx.finish({ grade: err <= 0.04 ? "ok" : "no", lines, extra: icmTable(names, st, 0) });
+          ctx.finish({ log: { guess: g, truth: +truth.toFixed(3) }, grade: err <= 0.04 ? "ok" : "no", lines, extra: icmTable(names, st, 0) });
         }, "enter"]]);
         return;
       }
@@ -757,7 +757,7 @@
           close ? "Right on the line: either is fine." : `Calling ${dEV >= 0 ? "gains" : "costs"} about <span class="m">${Math.abs(dEV).toFixed(1)}%</span> of the prize pool each time.`,
         ];
         const extra = h("div", {}, meter([["Your equity", eq, eq >= need ? "var(--ok)" : "var(--no)"], ["Chips need", chipNeed, "var(--tx4)"], ["ICM needs", need, "var(--brass)"]]), icmTable(["You", "Chip leader", "Seat 3", "Seat 4"], st, 0));
-        ctx.finish({ grade: ok ? "ok" : "no", lines, extra, verdict: close ? "Either works." : null });
+        ctx.finish({ log: { hand: CLASSES[cls].name, eq: +eq.toFixed(3), need: +need.toFixed(3), chipNeed: +chipNeed.toFixed(3), chose: call ? "call" : "fold" }, grade: ok ? "ok" : "no", lines, extra, verdict: close ? "Either works." : null });
       };
       ctx.buttons([["Fold", () => answer(false), "f", "fold"], ["Call", () => answer(true), "c"]]);
     },
@@ -890,7 +890,7 @@
     function heroTurn() {
       render();
       const L = TBLX.legal(H), bb = H.bl.bb, me = H.seats[0];
-      const A = TBLX.coach(H); let tries = 0;
+      const A = TBLX.coach(H); let tries = 0, guess = false, firstId = null, t0 = Date.now();
       const old = coachBox.querySelector(".fb.coach");
       if (old && !old.classList.contains("old")) { old.classList.add("old"); const v = old.querySelector(".v"); v.prepend(h("span", { class: "lastk" }, "Last decision · ")); v.onclick = () => old.classList.toggle("open"); }
       prompt.innerHTML = `Your move.<span class="sub">${L.toCall ? `${fmt(L.toCall)} to call · ` : ""}pot ${fmt(L.pot)}${L.toCall && (H.street > 0 || H.curBet > bb) ? ` · you need ${P(L.toCall / (L.pot + L.toCall))} to call` : ""}</span>`;
@@ -914,8 +914,13 @@
         opts.push([`All in ${fmt(L.maxTo)}`, { type: "allin" }, "a", "allin"]);
       }
       ctl.innerHTML = ""; ctl.classList.remove("hide"); current.keys = {};
+      const gz = guessToggle(v => { guess = v; });
+      prompt.append(gz.el);
       const choose = a => {
         const g = TBLX.grade(H, A, a);
+        const id = logDecision(A, a, g, tries, guess, Date.now() - t0);
+        if (tries === 0) { firstId = id; COACH.tally("skill:" + A.skill, g !== "no"); }
+        gz.reset(); t0 = Date.now();
         if (tries === 0 && g === "no") {
           tries = 1; skillHit(A.skill, 0); GS.n++; (GS.skills[A.skill] = GS.skills[A.skill] || [0, 0])[1]++; updScore();
           coachBox.querySelectorAll(".fb.old").forEach(x => x.remove());
@@ -925,6 +930,8 @@
         }
         if (tries === 0) { const v = g === "no" ? 0 : 1; skillHit(A.skill, v); GS.n++; GS.right += v; const sk = (GS.skills[A.skill] = GS.skills[A.skill] || [0, 0]); sk[0] += v; sk[1]++; }
         showVerdict(A, g, tries);
+        const fbv = coachBox.querySelector(".fb.coach");
+        if (fbv) fbv.append(flagCtl(firstId, `Hand ${G.handNo} · ${G.cash ? "cash" : "tournament"} · ${me.pos} · ${cardsTxt(me.cards)}${H.board.length ? " · board " + cardsTxt(H.board) : " · preflop"}`));
         ctl.innerHTML = ""; prompt.innerHTML = ""; current.keys = {};
         doAct(a); render(); step();
       };
@@ -934,6 +941,36 @@
         if (key) current.keys[key] = () => choose(a);
       }
       if (L.toCall === 0) current.keys.k = () => choose({ type: "check" });
+      current.keys.g = gz.toggle;
+    }
+    // Everything the coach needs to review this decision later, captured before the action is applied.
+    function logDecision(A, a, g, tries, guess, ms) {
+      const L = TBLX.legal(H), bb = H.bl.bb, me = H.seats[0], n = TBLX.normalize(H, a);
+      const others = H.order.filter(s => s !== 0 && !H.seats[s].folded).map(s => H.seats[s].stack + H.seats[s].bet);
+      const eff = Math.min(me.stack + me.bet, Math.max(0, ...others));
+      const tr = H.board.length ? TBLX.tier(me.cards, H.board) : null;
+      const vp = A.villain != null ? G.players[A.villain] : null, r3 = x => (x == null ? null : +(+x).toFixed(3));
+      return COACH.rec("decision", {
+        hand: H.key, game: G.key, mode: G.cash ? "cash" : "tourney", handNo: G.handNo, try: tries + 1,
+        street: ["preflop", "flop", "turn", "river"][H.street], spot: A.spot, skill: A.skill, pos: me.pos,
+        cards: cardsTxt(me.cards), cls: PE.CLASSES[TBLX.clsOf(me.cards[0], me.cards[1])].name, board: cardsTxt(H.board),
+        made: tr ? tr.desc : null, draw: tr ? tr.draw : 0, bb, pot: L.pot, toCall: L.toCall,
+        effBB: +(eff / bb).toFixed(1), spr: L.pot ? +(eff / L.pot).toFixed(2) : null,
+        villain: vp ? { seat: A.villain, name: vp.name, style: vp.style.tag, rangePct: r3(A.rangePct) } : null,
+        did: n.type + (n.to ? " " + n.to : ""), kind: TBLX.kindOf(H, a), best: A.best, accept: A.accept, grade: g,
+        eq: r3(A.eq), need: r3(A.need), guess, ms, why: (A.lines || []).map(COACH.plain), hint: tries ? COACH.plain(A.hint) : undefined,
+      });
+    }
+    function logHand() {
+      const bb = H.bl.bb, mode = G.cash ? "cash" : "tourney";
+      COACH.rec("hand", {
+        mode, game: G.key, no: G.handNo, blinds: { sb: H.bl.sb, bb, ante: H.bl.ante || 0, level: H.bl.level || null }, btn: G.btn,
+        seats: H.order.map(s => ({ seat: s, pos: H.seats[s].pos, who: s ? G.players[s].name : "You", style: s ? G.players[s].style.tag : null, stack: H.startStacks[s], cards: cardsTxt(H.seats[s].cards) })),
+        actions: H.actions.map(x => ({ seat: x.seat, street: x.street, type: x.type, to: x.to, amount: x.amount, allin: x.allin || undefined })),
+        board: cardsTxt(H.board), shown: H.result.shown, wins: H.result.wins, ranOut: !!H.ranOut,
+        net: H.seats[0] ? +((G.players[0].stack - H.startStacks[0]) / bb).toFixed(2) : null, place: G.places[0] || null,
+      }, H.key);
+      if (H.seats[0]) COACH.tally("hand:" + mode, 1);
     }
     function rangeBlock(A) {
       if (!A.range || A.spot === "open" || A.spot === "shove" || A.spot === "option") return null;
@@ -957,7 +994,7 @@
     }
     function handOver() {
       render(); prompt.innerHTML = ""; ctl.innerHTML = "";
-      GS.hands++;
+      GS.hands++; logHand();
       const r = H.result, lines = [];
       const winners = Object.keys(r.wins).map(Number);
       for (const s of winners) {
@@ -970,6 +1007,7 @@
       const fb = h("div", { class: "fb end" }, h("div", { class: "v" }, winners.includes(0) ? "Your pot." : "Hand over."), lines.map(l => h("p", { class: "ln", html: l })));
       const nb = h("button", { class: "btn" }, G.over ? "See how you did" : "Next hand", h("kbd", {}, "↵"));
       const next = () => (G.over ? gameOver() : deal());
+      if (H.seats[0]) fb.append(flagCtl(H.key, `Hand ${G.handNo} · ${G.cash ? "cash" : "tournament"} · ${cardsTxt(H.seats[0].cards)} · the whole hand`));
       nb.onclick = next; fb.append(h("div", { class: "go" }, nb));
       endBox.innerHTML = ""; endBox.append(fb);
       current.keys = { enter: next, " ": next };
@@ -978,6 +1016,7 @@
     function gameOver() {
       token++; coachBox.innerHTML = ""; endBox.innerHTML = ""; felt.innerHTML = ""; heroZ.innerHTML = ""; info.innerHTML = "";
       const place = G.places[0] || 1, paid = place <= TBLX.PAYOUT.length;
+      if (!G.logged) { G.logged = true; COACH.rec("game", { mode: "tourney", game: G.key, place, hands: G.handNo, right: GS.right, n: GS.n }); }
       const fb = h("div", { class: "fb " + (paid ? "ok" : "no") }, h("div", { class: "v" }, `You finished ${ordinal(place)} of 6.`),
         h("p", { class: "ln", html: paid ? `In the money: <b>${TBLX.PAYOUT[place - 1]}%</b> of the prize pool.` : place === 3 ? "Out on the <b>bubble</b>, one place from the money. That's the spot where survival is worth the most." : "Out before the money." }),
         h("p", { class: "ln", html: `${G.handNo} hands · your decisions: <b>${GS.right}/${GS.n}</b> right first time.` }),
@@ -998,10 +1037,155 @@
       }
       H = TBLX.newHand(G);
       if (!H) return gameOver();
+      if (!G.key) G.key = COACH.newId();
+      H.key = COACH.newId();
       render(); step();
     }
     deal();
     window.scrollTo(0, 0);
+  }
+
+  // =========================================================
+  // COACH: sure/guessing, flags, This week, sync (data layer in coach.js)
+  // =========================================================
+  const FLAG_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg>';
+  function guessToggle(onChange) {
+    let on = false;
+    const b = h("button", { class: "guess", type: "button", "aria-pressed": "false" }, h("i"), "I'm guessing", h("kbd", {}, "G"));
+    const set = v => { on = v; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); onChange(on); };
+    b.onclick = () => set(!on);
+    return { el: h("div", { class: "guessrow" }, h("span", {}, "Not sure? Tap this first"), b), toggle: () => set(!on), reset: () => set(false) };
+  }
+  function flagCtl(ref, label) {
+    const box = h("div", { class: "flagbox" });
+    const draw = () => {
+      box.innerHTML = "";
+      const f = COACH.flags()[ref];
+      box.classList.toggle("on", !!f);
+      if (!f) {
+        const b = h("button", { class: "flagb", type: "button" }, h("span", { class: "fi", html: FLAG_SVG }), "Flag for coach");
+        b.onclick = () => { COACH.flag(ref, label); draw(); };
+        return box.append(b);
+      }
+      const ta = h("textarea", { rows: "3", placeholder: "What's confusing you? (optional)", "aria-label": "Note for your coach" });
+      ta.value = f.note || "";
+      const saved = h("span", { class: "saved" }, f.note ? "Saved" : "");
+      ta.oninput = () => { saved.textContent = ""; };
+      const sv = h("button", { class: "btn ghost", type: "button" }, "Save note");
+      sv.onclick = () => { COACH.note(ref, ta.value.trim()); saved.textContent = "Saved"; };
+      const un = h("button", { class: "unflag", type: "button" }, "Unflag");
+      un.onclick = () => { COACH.unflag(ref); draw(); };
+      box.append(h("div", { class: "fh" }, h("span", { class: "fi", html: FLAG_SVG }), h("span", {}, "Flagged for your coach"), un), ta, h("div", { class: "fr" }, saved, sv));
+    };
+    draw();
+    return box;
+  }
+  const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago"; };
+  function syncPill() {
+    const st = COACH.status();
+    const txt = !st.connected ? "Coach sync · set up" : st.err ? "Sync problem · tap to see" : st.busy ? "Syncing…" :
+      (st.last ? "Synced " + ago(st.last) : "Not synced yet") + (st.waiting ? ` · ${st.waiting} waiting` : "");
+    return h("button", { class: "syncpill" + (!st.connected ? " off" : st.err ? " err" : ""), type: "button", onclick: () => { location.hash = "#/sync"; } }, h("i"), txt);
+  }
+  function planCard() {
+    const p = COACH.plan();
+    if (!p || !p.title) return null;
+    const t = h("div", { class: "t" }), s = h("p", { class: "s" });
+    t.textContent = p.title; s.textContent = p.why || "";
+    const sec = h("section", { class: "plan" }, h("div", { class: "k" }, "This week · from your coach" + (p.week ? " · " + p.week : "")), t, s);
+    for (const task of p.tasks || []) {
+      let txt, frac, done;
+      if (task.kind === "drill" && task.goal === "solid") {
+        const last = stat(task.key).hist.slice(-WINDOW), r = last.filter(Boolean).length;
+        done = solidOf(task.key); txt = done ? "Solid ✓" : last.length ? `${r} of last ${last.length} right` : "not started"; frac = done ? 1 : Math.min(1, r / SOLID);
+      } else {
+        const pr = COACH.progress(task, p.since), n = task.n || 1;
+        done = pr.n >= n; frac = Math.min(1, pr.n / n);
+        txt = `${Math.min(pr.n, n)} / ${n}` + (task.kind !== "hands" && pr.n ? ` · ${pr.right} right` : "");
+      }
+      const name = h("span"); name.textContent = task.text || "";
+      const row = h("button", { class: "task" + (done ? " done" : ""), type: "button" },
+        h("div", { class: "tl" }, name, h("span", { class: "m" }, txt)), h("div", { class: "trk" }, h("i", { style: `width:${Math.round(frac * 100)}%` })));
+      row.onclick = () => { location.hash = task.kind === "drill" && DRILLS.some(d => d.id === task.key) ? "#/" + task.key : "#/lobby"; };
+      sec.append(row);
+    }
+    if (p.next) { const nx = h("p", { class: "nx" }); nx.textContent = p.next; sec.append(nx); }
+    return sec;
+  }
+  function flagsRow() {
+    const fl = COACH.flags(), rp = COACH.replies(), refs = Object.keys(fl);
+    const nrep = refs.filter(r => rp[r]).length;
+    if (!refs.length) return null;
+    return h("button", { class: "next flagsrow", type: "button", onclick: () => { location.hash = "#/flags"; } },
+      h("div", {}, h("div", { class: "k" }, "Your flags"), h("div", { class: "t" }, nrep ? `${nrep} repl${nrep === 1 ? "y" : "ies"} from your coach` : `${refs.length} flagged`),
+        h("div", { class: "s" }, nrep ? "On hands you flagged" : "Waiting for your next coaching session")),
+      h("span", { class: "arrow" }, "→"));
+  }
+  COACH.onChange(() => {
+    if (location.hash && location.hash !== "#/") { if (location.hash === "#/sync") syncPage(true); return; }
+    const w = app.querySelector(".wrap"); if (!w) return;
+    const pill = w.querySelector(".syncpill"); if (pill) pill.replaceWith(syncPill());
+    const old = w.querySelector(".plan"), pc = planCard(), tcard = w.querySelector(".next.table");
+    if (old) old.remove(); if (pc && tcard) tcard.before(pc);
+    const of = w.querySelector(".flagsrow"), fr = flagsRow();
+    if (of) of.remove(); if (fr && tcard) tcard.before(fr);
+  });
+  const pageBar = (small, title) => h("div", { class: "bar" }, h("button", { class: "back", onclick: () => { location.hash = ""; }, "aria-label": "Back" }, "←"),
+    h("div", { class: "ttl" }, h("small", {}, small), title), h("div", { class: "score" }));
+  function syncPage(keepInput) {
+    const prev = keepInput && app.querySelector("#synckey") ? app.querySelector("#synckey").value : "";
+    current = null; document.title = "Coach sync · Felt"; app.innerHTML = "";
+    const st = COACH.status();
+    const w = h("div", { class: "wrap page" }, pageBar("Settings", "Coach sync"),
+      h("p", { class: "lede" }, "Every hand, decision and drill answer goes to your private felt-data store on GitHub. Your coach reads it on your Mac, then sends back a plan and replies to your flags. No signal? It all waits on your phone and goes up later."));
+    if (st.connected) {
+      const msg = h("p", { class: "ln" + (st.err ? " bad" : "") }); msg.textContent = st.err || (st.last ? "Last synced " + ago(st.last) + "." : "Not synced yet.");
+      const now = h("button", { class: "btn", type: "button" }, st.busy ? "Syncing…" : "Sync now");
+      now.onclick = async () => { now.textContent = "Syncing…"; await COACH.syncNow(); syncPage(); };
+      const off = h("button", { class: "btn ghost", type: "button" }, "Disconnect");
+      off.onclick = () => { if (confirm("Disconnect this phone? Anything not uploaded stays on the phone.")) { COACH.disconnect(); syncPage(); } };
+      w.append(h("section", { class: "card2" }, h("div", { class: "k" }, "Connected · " + COACH.REPO + " (private)"), msg,
+        h("p", { class: "ln" }, `${st.waiting} record${st.waiting === 1 ? "" : "s"} waiting to upload.`), h("div", { class: "go" }, off, now)));
+    } else {
+      const inp = h("input", { id: "synckey", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "github_pat_…" });
+      inp.value = prev;
+      const err = h("p", { class: "ln bad" });
+      const go = h("button", { class: "btn", type: "button" }, "Connect");
+      go.onclick = async () => { go.textContent = "Checking…"; go.disabled = true; const e = await COACH.connect(inp.value); if (e) { err.textContent = e; go.textContent = "Connect"; go.disabled = false; } else syncPage(); };
+      w.append(h("section", { class: "card2" }, h("div", { class: "k" }, "One-time setup · about 3 minutes"),
+        h("ol", { class: "steps" },
+          h("li", { html: `On GitHub, open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">new fine-grained token</a>.` }),
+          h("li", { html: `Name it <b>Felt</b>. Expiration: <b>1 year</b>.` }),
+          h("li", { html: `Repository access: <b>Only select repositories</b> → <b>felt-data</b>.` }),
+          h("li", { html: `Permissions → Repository → <b>Contents: Read and write</b>. Nothing else.` }),
+          h("li", { html: `Generate it, copy it, paste it here. Don't send it to anyone, including Claude.` })),
+        h("label", { for: "synckey", class: "lbl" }, "Your key"), inp, err, h("div", { class: "go" }, go)));
+    }
+    w.append(h("section", { class: "card2 quiet" }, h("div", { class: "k" }, "What gets sent"),
+      h("p", { class: "ln" }, "Each table hand in full (everyone's cards, every bet, the result). Each decision: the spot, what you did, what the coach wanted, the numbers, sure or guessing, and how long you took. Each drill answer. Your flags and notes. Nothing else from your phone.")));
+    app.append(w); window.scrollTo(0, 0);
+  }
+  function flagsPage() {
+    current = null; document.title = "Your flags · Felt"; app.innerHTML = "";
+    const fl = COACH.flags(), rp = COACH.replies();
+    const w = h("div", { class: "wrap page" }, pageBar("Coach", "Your flags"));
+    const refs = Object.keys(fl).sort((a, b) => fl[b].t - fl[a].t);
+    if (!refs.length) w.append(h("p", { class: "lede" }, "Nothing flagged yet. Tap “Flag for coach” under any verdict and it shows up here and in your next coaching session."));
+    for (const ref of refs) {
+      const f = fl[ref], r = rp[ref];
+      const lab = h("div", { class: "k" }); lab.textContent = f.label || ref;
+      const sec = h("section", { class: "card2" + (r ? " replied" : "") }, lab);
+      if (f.note) { const n = h("p", { class: "you" }); n.textContent = "You: “" + f.note + "”"; sec.append(n); }
+      if (r) {
+        sec.append(h("div", { class: "who" }, "Coach"));
+        String(r.text || "").split(/\n\s*\n/).forEach(par => { const p = h("p", { class: "ln" }); p.textContent = par.trim(); sec.append(p); });
+      } else sec.append(h("p", { class: "ln dim" }, "Waiting for your next coaching session."));
+      const un = h("button", { class: "unflag", type: "button" }, r ? "Done, remove" : "Unflag");
+      un.onclick = () => { COACH.unflag(ref); flagsPage(); };
+      sec.append(h("div", { class: "fr" }, un));
+      w.append(sec);
+    }
+    app.append(w); window.scrollTo(0, 0);
   }
 
   // =========================================================
@@ -1043,6 +1227,10 @@
       h("div", {}, h("div", { class: "k" }, G && !G.over ? "Your seat is still warm" : "Play"), h("div", { class: "t" }, "The table"), h("div", { class: "s" }, "Real hands, cash game or tournament, against five players. A coach checks every decision.")),
       h("span", { class: "btn" }, "Sit")), w.querySelector(".next"));
     w.querySelector(".next:not(.table) .k").textContent = ns.n ? "Practice reps · pick up where you left off" : "Practice reps · start here";
+    w.querySelector(".mast").after(syncPill());
+    const tcard = w.querySelector(".next.table"), pc = planCard(), fr = flagsRow();
+    if (pc) tcard.before(pc);
+    if (fr) tcard.before(fr);
     if (lr.length) w.append(h("section", { class: "act" }, h("h2", {}, h("i", {}, "YOU"), "Strong and weak"), h("p", { class: "lede" }, "From your decisions at the table, weakest first."), ...lr));
     for (const a of [1, 2, 3]) {
       const [num, name, lede] = ACTS[a];
@@ -1073,18 +1261,20 @@
     const updScore = () => { const last = s.hist.slice(-WINDOW); score.innerHTML = `<b>${last.filter(Boolean).length}</b>/${last.length || 0} · run <b>${s.streak}</b>`; };
     const idea = h("details", { class: "idea" }, h("summary", {}, "The idea"), h("div", { class: "body", html: d.idea }));
     if (!s.seen) { idea.open = true; s.seen = true; save(); }
-    const stage = h("div"), prompt = h("div", { class: "prompt" }), ctl = h("div", { class: "ctl" }), fbBox = h("div");
+    const stage = h("div"), prompt = h("div", { class: "prompt" }), ctl = h("div", { class: "ctl" }), fbBox = h("div"), gzBox = h("div");
     const w = h("div", { class: "wrap" },
       h("div", { class: "bar" }, h("button", { class: "back", onclick: () => { location.hash = ""; }, "aria-label": "Back" }, "←"),
         h("div", { class: "ttl" }, h("small", {}, `${String(num).padStart(2, "0")} · Act ${ACTS[d.act][0]}`), d.title), score),
-      idea, stage, prompt, ctl, fbBox);
+      idea, stage, prompt, gzBox, ctl, fbBox);
     app.append(w);
     updScore();
     current = { keys: {} };
     function deal() {
       stage.innerHTML = ""; prompt.innerHTML = ""; ctl.innerHTML = ""; fbBox.innerHTML = ""; ctl.classList.remove("hide");
+      let guess = false; const t0 = Date.now(), gz = guessToggle(v => { guess = v; });
+      gzBox.innerHTML = ""; gzBox.append(gz.el);
       const ctx = current = {
-        stage, prompt, ctl, keys: {}, done: false,
+        stage, prompt, ctl, keys: { g: gz.toggle }, done: false,
         buttons(list) {
           ctl.innerHTML = ""; const els = [];
           for (const [label, fn, key, cls] of list) {
@@ -1100,6 +1290,11 @@
           const ok = r.grade === "ok";
           s.hist.push(ok ? 1 : 0); if (s.hist.length > 60) s.hist.splice(0, s.hist.length - 60);
           s.n++; s.streak = ok ? s.streak + 1 : 0; s.best = Math.max(s.best, s.streak); save(); updScore();
+          const q = COACH.plain(prompt.innerHTML);
+          const rid = COACH.rec("drill", { drill: d.id, title: d.title, grade: r.grade, ok, guess, ms: Date.now() - t0, q,
+            why: r.lines.map(COACH.plain), note: r.note ? COACH.plain(r.note) : undefined, log: r.log || null });
+          COACH.tally("drill:" + d.id, ok);
+          gzBox.innerHTML = "";
           if (!r.keepCtl) ctl.classList.add("hide");
           const verdict = r.verdict || (ok ? pick(["Right.", "Yes.", "Correct.", "Spot on."]) : r.grade === "mid" ? "Close." : pick(["Not quite.", "No.", "Not this time."]));
           const fb = h("div", { class: "fb " + (ok && !r.verdict ? "ok" : ok ? "mid" : r.grade === "mid" ? "mid" : "no") }, h("div", { class: "v" }, verdict));
@@ -1108,6 +1303,7 @@
           if (r.note) fb.append(h("p", { class: "ln k", html: r.note }));
           const nb = h("button", { class: "btn" }, "Next hand", h("kbd", {}, "↵"));
           nb.onclick = deal;
+          fb.append(flagCtl(rid, `${d.title}${q ? " · " + q.slice(0, 70) : ""}`));
           fb.append(h("div", { class: "go" }, nb));
           fbBox.append(fb);
           ctx.keys = { enter: deal, " ": deal };
@@ -1122,6 +1318,7 @@
 
   document.addEventListener("keydown", e => {
     if (!current || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target && e.target.closest && e.target.closest("textarea, input")) return; // typing a note, not playing
     const k = e.key === "Enter" ? "enter" : e.key.length === 1 ? e.key.toLowerCase() : e.key;
     const fn = current.keys && current.keys[k];
     if (fn) { e.preventDefault(); fn(); }
@@ -1131,6 +1328,8 @@
     const m = location.hash.match(/^#\/(\w+)/);
     if (!m) return home();
     if (m[1] === "lobby") return lobby();
+    if (m[1] === "sync") return syncPage();
+    if (m[1] === "flags") return flagsPage();
     if (m[1] === "play") return G && !G.over ? playTable() : lobby();
     drill(m[1]);
   };
