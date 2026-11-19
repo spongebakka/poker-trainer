@@ -112,6 +112,10 @@
   const POS_NAME = { BTN: "Button", SB: "Small blind", BB: "Big blind", UTG: "Under the gun", HJ: "Hijack", CO: "Cutoff" };
   const PRE_ORDER = ["UTG", "HJ", "CO", "BTN", "SB", "BB"];
   const SEAT_XY = [[50, 90], [9, 68], [13, 22], [50, 7], [87, 22], [91, 68]];
+  // The coached table is portrait (tall oval): seat, bet and dealer-button spots in % of the table box.
+  const TSEAT = [[50, 88], [9.5, 62.6], [9.5, 25.3], [50, 2.7], [90.5, 25.3], [90.5, 62.6]];
+  const TBET = [[50, 71], [30, 53.5], [30, 34.5], [50, 17], [70, 34.5], [70, 53.5]];
+  const TDLR = [[30, 71], [26.3, 64.5], [26.3, 23.4], [66, 10], [73.7, 23.4], [73.7, 64.5]];
   const toward = (xy, f) => [xy[0] + (50 - xy[0]) * f, xy[1] + (47 - xy[1]) * f];
   const posAt = (seat, btn) => POS6[(seat - btn + 6) % 6];
 
@@ -815,48 +819,66 @@
     document.title = (G.cash ? "Cash game" : "Tournament") + " · Felt";
     app.innerHTML = "";
     const score = h("div", { class: "score" }), info = h("div", { class: "tinfo" });
-    const felt = h("div", { class: "felt oval tbl" }), heroZ = h("div", { class: "herozone" });
-    const prompt = h("div", { class: "prompt sm" }), ctl = h("div", { class: "ctl tctl" }), coachBox = h("div"), endBox = h("div");
-    const w = h("div", { class: "wrap" },
+    const felt = h("div", { class: "ptable" }), sheet = h("div", { class: "tsheet" }), coachBox = h("div", { class: "tcoach" }), endBox = h("div");
+    const w = h("div", { class: "wrap tview" },
       h("div", { class: "bar" }, h("button", { class: "back", onclick: () => { token++; lobby(); history.replaceState(null, "", "#/lobby"); }, "aria-label": "Back" }, "←"),
-        h("div", { class: "ttl" }, h("small", {}, "The table"), G.cash ? "Cash game" : "Tournament"), score),
-      info, felt, heroZ, prompt, ctl, coachBox, endBox);
+        h("div", { class: "ttl" }, G.cash ? "Cash game" : "Tournament", info), score),
+      h("div", { class: "pwrap" }, felt), sheet, coachBox, endBox);
     app.append(w);
     let H = null, say = {}, token = 0, seen = new Set();
     current = { keys: {} };
     const updScore = () => { score.innerHTML = `<b>${GS.right}</b>/${GS.n} · hand <b>${G.handNo}</b>`; };
 
+    const pct = xy => `left:${xy[0]}%;top:${xy[1]}%`;
+    const bbTxt = x => `${+(x / H.bl.bb).toFixed(1)} bb`;
+    const denoms = () => (G.cash ? [100, 25, 5, 1] : [500, 100, 25, 5]);
     function render() {
       updScore();
       const bl = H.bl, me = G.players[0];
       info.innerHTML = G.cash ? `Blinds <b>1/2</b> · you're <b class="${me.stack + 0 - G.buyins * TBLX.CASH_BUYIN >= 0 ? "up" : "dn"}">${(me.stack - G.buyins * TBLX.CASH_BUYIN) >= 0 ? "+" : "−"}${fmt(Math.abs(me.stack - G.buyins * TBLX.CASH_BUYIN) / 2)} bb</b>${G.buyins > 1 ? ` · ${G.buyins} buy-ins` : ""}`
         : `Level <b>${bl.level}</b> · ${fmt(bl.sb)}/${fmt(bl.bb)}${bl.ante ? ` · ante ${fmt(bl.ante)}` : ""} · <b>${TBLX.liveSeats(G).length}</b> left · up in ${bl.handsLeft} hand${bl.handsLeft === 1 ? "" : "s"}`;
       felt.innerHTML = "";
-      SEAT_XY.forEach((xy, s) => {
+      felt.append(h("div", { class: "prail" }, h("div", { class: "pfelt" }, h("div", { class: "pline" }))), h("div", { class: "plogo" }, "Felt."));
+      let bets = 0;
+      TSEAT.forEach((xy, s) => {
         const p = G.players[s], hs = H.seats[s];
-        if (!hs) { felt.append(h("div", { class: "seat empty", style: `left:${xy[0]}%;top:${xy[1]}%` }, h("div", { class: "plate" }, h("div", { class: "p" }, p.stack > 0 ? p.name : "—"), h("div", { class: "q" }, p.stack > 0 ? "sitting out" : G.places[s] ? `out · ${ordinal(G.places[s])}` : "empty")))); return; }
-        const showFace = H.over && H.result.shown.includes(s) || (s === 0);
-        const cards = hs.folded ? [] : s === 0 ? [] : showFace ? hs.cards.map(c => { const e = cardEl(c, { sm: true }); e.style.setProperty("--rot", stableRot(c)); return e; }) : [backEl(), backEl()];
+        if (hs && hs.bet > 0) { bets += hs.bet; felt.append(h("div", { class: "pbet", style: pct(TBET[s]) }, chipsEl(hs.bet, { denoms: denoms(), label: fmt(hs.bet) }))); }
+        if (s === 0) return;
+        const side = xy[0] > 50 ? " rt" : "";
+        if (!hs) {
+          felt.append(h("div", { class: "pseat empty" + side, style: pct(xy) }, h("div", { class: "ava" }, p.stack > 0 ? p.name[0] : ""),
+            h("div", { class: "plate" }, h("b", {}, p.stack > 0 ? p.name : "—"), h("span", {}, p.stack > 0 ? "sitting out" : G.places[s] ? `out · ${ordinal(G.places[s])}` : "empty"))));
+          return;
+        }
+        const showFace = H.over && H.result.shown.includes(s);
+        const cards = hs.folded ? null : h("div", { class: "pcards" + (showFace ? " face" : "") }, showFace ? hs.cards.map(c => cardEl(c, { sm: true, flat: true })) : [backEl(), backEl()]);
         const won = H.over && H.result.wins[s];
-        const el = h("div", { class: "seat" + (s === H.toAct && !H.over ? " turn" : "") + (hs.folded ? " out" : "") + (won ? " win" : "") + (s === 0 ? " hero" : ""), style: `left:${xy[0]}%;top:${xy[1]}%` },
+        felt.append(h("div", { class: "pseat" + side + (s === H.toAct && !H.over ? " turn" : "") + (hs.folded ? " out" : "") + (won ? " win" : ""), style: pct(xy) },
           say[s] ? h("div", { class: "say" + (say[s].k ? " " + say[s].k : "") }, say[s].t) : null,
-          s === 0 ? null : h("div", { class: "mini" }, cards),
-          h("div", { class: "plate" }, h("div", { class: "p" }, s === 0 ? "You" : p.name, h("span", { class: "pos" }, hs.pos)), h("div", { class: "q" }, fmt(hs.stack)), s ? h("div", { class: "tg" }, p.style.tag) : null));
-        felt.append(el);
-        if (hs.bet > 0) { const b = toward(xy, 0.4); felt.append(h("div", { class: "blind", style: `left:${b[0]}%;top:${b[1]}%` }, chipsEl(hs.bet, { denoms: G.cash ? [100, 25, 5, 1] : [500, 100, 25, 5], label: fmt(hs.bet) }))); }
+          h("div", { class: "ava" }, p.name[0], h("span", { class: "pos" }, hs.pos)), cards,
+          h("div", { class: "plate" }, h("b", {}, p.name), h("span", {}, fmt(hs.stack))),
+          h("div", { class: "tg" }, p.style.tag === "calling station" ? "station" : p.style.tag)));
       });
-      const bxy = toward(SEAT_XY[G.btn], 0.25);
-      felt.append(h("div", { class: "dbtn", style: `left:${bxy[0] + 7}%;top:${bxy[1]}%` }, "D"));
+      felt.append(h("div", { class: "dbtn", style: pct(TDLR[G.btn]) }, "D"));
       const pot = H.over ? 0 : TBLX.potTotal(H);
-      const board = h("div", { class: "cards bd" }, H.board.map((c, k) => { const e = cardEl(c, { deal: seen.has(c) ? null : 0.05 * k }); e.style.setProperty("--rot", stableRot(c)); seen.add(c); return e; }));
-      felt.append(h("div", { class: "tmid" }, pot ? h("div", { class: "potl" }, "Pot ", h("b", {}, fmt(TBLX.potTotal(H)))) : h("div", { class: "potl" }, " "), board));
+      felt.append(h("div", { class: "ppot" }, pot - bets > 0 ? chipsEl(pot - bets, { denoms: denoms(), label: false }) : null,
+        pot ? h("div", {}, h("i", {}, "Pot"), h("b", {}, fmt(pot)), h("span", {}, bbTxt(pot))) : null));
+      const board = h("div", { class: "pboard" });
+      for (let k = 0; k < 5; k++) {
+        const c = H.board[k];
+        if (c == null) { board.append(h("div", { class: "slot" })); continue; }
+        const e = cardEl(c, { deal: seen.has(c) ? null : 0.05 * k }); e.style.setProperty("--rot", stableRot(c)); seen.add(c); board.append(e);
+      }
+      felt.append(board);
       // hero
       const hs = H.seats[0];
-      heroZ.innerHTML = "";
       if (hs) {
-        const cs = h("div", { class: "cards" }, hs.cards.map((c, k) => { const e = cardEl(c, { deal: seen.has(c) ? null : 0.1 + k * 0.08, cls: hs.folded ? "muck" : "" }); e.style.setProperty("--rot", stableRot(c)); seen.add(c); return e; }));
+        felt.append(h("div", { class: "phero" }, hs.cards.map((c, k) => { const e = cardEl(c, { deal: seen.has(c) ? null : 0.1 + k * 0.08, cls: hs.folded ? "muck" : "" }); seen.add(c); return e; })));
         const made = H.board.length && !hs.folded ? TBLX.tier(hs.cards, H.board).desc : PE.CLASSES[TBLX.clsOf(hs.cards[0], hs.cards[1])].name;
-        heroZ.append(cs, h("div", { class: "lbl", html: `<b>${hs.pos}</b> · ${fmt(hs.stack)} <span>(${(hs.stack / H.bl.bb).toFixed(hs.stack / H.bl.bb < 10 ? 1 : 0)} bb)</span> · ${made}` }));
+        felt.append(h("div", { class: "phand" }, h("span", {}, hs.folded ? "Folded" : made.replace(/^./, m => m.toUpperCase()))));
+        felt.append(h("div", { class: "pme" + (H.toAct === 0 && !H.over ? " turn" : "") + (H.over && H.result.wins[0] ? " win" : "") },
+          say[0] ? h("div", { class: "say" + (say[0].k ? " " + say[0].k : "") }, say[0].t) : null,
+          h("i", {}, "You · " + hs.pos), h("b", {}, fmt(hs.stack)), h("small", {}, bbTxt(hs.stack))));
       }
     }
     const ordinal = n => n + (n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th");
@@ -893,29 +915,51 @@
       const A = TBLX.coach(H); let tries = 0, guess = false, firstId = null, t0 = Date.now();
       const old = coachBox.querySelector(".fb.coach");
       if (old && !old.classList.contains("old")) { old.classList.add("old"); const v = old.querySelector(".v"); v.prepend(h("span", { class: "lastk" }, "Last decision · ")); v.onclick = () => old.classList.toggle("open"); }
-      prompt.innerHTML = `Your move.<span class="sub">${L.toCall ? `${fmt(L.toCall)} to call · ` : ""}pot ${fmt(L.pot)}${L.toCall && (H.street > 0 || H.curBet > bb) ? ` · you need ${P(L.toCall / (L.pot + L.toCall))} to call` : ""}</span>`;
-      const opts = [];
-      if (L.toCall > 0) opts.push(["Fold", { type: "fold" }, "f", "fold"]);
-      opts.push(L.toCall ? [L.toCall >= me.stack ? `Call all in ${fmt(L.toCall)}` : `Call ${fmt(L.toCall)}`, { type: "call" }, "c", "mid"] : ["Check", { type: "check" }, "c", "mid"]);
+      // the move: fold / call or check / raise, with the raise sizes picked above the buttons
+      const base = [];
+      if (L.toCall > 0) base.push({ label: "Fold", a: { type: "fold" }, key: "f", cls: "fo" });
+      base.push(L.toCall ? { label: L.toCall >= me.stack ? `Call all in ${fmt(L.toCall)}` : `Call ${fmt(L.toCall)}`, a: { type: "call" }, key: "c", cls: "ca" } : { label: "Check", a: { type: "check" }, key: "c", cls: "ca" });
+      const raises = [];
       if (L.canRaise) {
-        const raises = H.actions.filter(a => a.street === H.street && a.type === "raise").length, sizes = [];
+        const nr = H.actions.filter(a => a.street === H.street && a.type === "raise").length, sizes = [];
         if (H.street === 0) {
-          if (raises === 0) { const S = me.stack / bb; sizes.push(L.toCall === 0 ? 3 * bb + H.curBet - bb : (me.pos === "SB" ? 3 : S < 30 ? 2.2 : 2.5) * bb); }
-          else sizes.push(H.curBet * (raises === 1 ? 3 : 2.3));
+          if (nr === 0) { const S = me.stack / bb; sizes.push(L.toCall === 0 ? 3 * bb + H.curBet - bb : (me.pos === "SB" ? 3 : S < 30 ? 2.2 : 2.5) * bb); }
+          else sizes.push(H.curBet * (nr === 1 ? 3 : 2.3));
         } else if (L.toCall === 0) for (const f of [0.33, 0.66, 1]) sizes.push(Math.max(bb, Math.round(L.pot * f)));
         else sizes.push(H.curBet * 3);
         const seen2 = new Set(); let k = 1;
+        const word = H.street === 0 ? (nr === 0 ? "Raise to" : nr === 1 ? "3-bet to" : "4-bet to") : L.toCall === 0 ? "Bet" : "Raise to";
+        const short = H.street === 0 ? (nr === 0 ? "Raise" : nr === 1 ? "3-bet" : "4-bet") : L.toCall === 0 ? "Bet" : "Raise";
         for (const to0 of sizes) {
           const n = TBLX.normalize(H, { type: "raise", to: to0 }); if (n.type !== "raise" || n.to >= L.maxTo || seen2.has(n.to)) continue; seen2.add(n.to);
-          const word = H.street === 0 ? (raises === 0 ? "Raise to" : raises === 1 ? "3-bet to" : "4-bet to") : L.toCall === 0 ? "Bet" : "Raise to";
-          const extra = H.street > 0 && L.toCall === 0 ? ` <small>${Math.round((n.to - me.bet) / L.pot * 100)}% pot</small>` : H.street === 0 ? ` <small>${+(n.to / bb).toFixed(1)} bb</small>` : "";
-          opts.push([`${word} ${fmt(n.to)}${extra}`, n, String(k++), ""]);
+          const sub = H.street > 0 && L.toCall === 0 ? `${Math.round((n.to - me.bet) / L.pot * 100)}% pot` : `${word.toLowerCase().replace(" to", "")} · ${+(n.to / bb).toFixed(1)} bb`;
+          raises.push({ top: fmt(n.to), sub, label: `${short} ${fmt(n.to)}`, a: n, key: String(k++) });
         }
-        opts.push([`All in ${fmt(L.maxTo)}`, { type: "allin" }, "a", "allin"]);
+        raises.push({ top: "All in", sub: fmt(L.maxTo), label: `All in ${fmt(L.maxTo)}`, a: { type: "allin" }, key: "a", allin: true });
       }
-      ctl.innerHTML = ""; ctl.classList.remove("hide"); current.keys = {};
       const gz = guessToggle(v => { guess = v; });
-      prompt.append(gz.el);
+      sheet.innerHTML = ""; current.keys = {};
+      const tile = (k, v, sm, extra) => h("div", { class: "st" }, h("i", {}, k), h("b", {}, v), sm ? h("small", {}, sm) : null, extra || null);
+      const showNeed = L.toCall && (H.street > 0 || H.curBet > bb), need = L.toCall / (L.pot + L.toCall);
+      const live = H.order.filter(s => !H.seats[s].folded).length;
+      const tiles = L.toCall
+        ? [tile("To call", fmt(L.toCall), bbTxt(L.toCall)), tile("Pot", fmt(L.pot), bbTxt(L.pot)),
+          showNeed ? tile("You need", P(need), null, h("div", { class: "nm" }, h("span", { style: `width:${(need * 100).toFixed(1)}%` }))) : tile("Behind", fmt(me.stack), bbTxt(me.stack))]
+        : [tile("Pot", fmt(L.pot), bbTxt(L.pot)), tile("Behind", fmt(me.stack), bbTxt(me.stack)), tile("Players", String(live), H.street ? "still in" : "in the hand")];
+      sheet.append(h("div", { class: "rowa" }, h("h2", {}, "Your move"), gz.el), h("div", { class: "stats" }, tiles));
+      let sel = 0;
+      const raiseBtn = raises.length ? h("button", { class: "b ra" }) : null;
+      const sizeBtns = raises.map((r, i) => {
+        const b = h("button", { class: "sz" + (r.allin ? " allin" : ""), type: "button" }, h("b", {}, r.top), h("small", {}, r.sub));
+        b.onclick = () => pick(i); return b;
+      });
+      const pick = i => {
+        sel = i; sizeBtns.forEach((b, j) => b.classList.toggle("on", j === i));
+        raiseBtn.innerHTML = raises[i].label + "<kbd>R</kbd>"; raiseBtn.classList.toggle("allin", !!raises[i].allin);
+      };
+      if (raises.length) { sheet.append(h("div", { class: "sizes" }, sizeBtns)); pick(0); }
+      const acts = h("div", { class: "acts", style: `grid-template-columns:repeat(${base.length + (raises.length ? 1 : 0)},minmax(0,1fr))` });
+      sheet.append(acts);
       const choose = a => {
         const g = TBLX.grade(H, A, a);
         const id = logDecision(A, a, g, tries, guess, Date.now() - t0);
@@ -929,18 +973,21 @@
           return;
         }
         if (tries === 0) { const v = g === "no" ? 0 : 1; skillHit(A.skill, v); GS.n++; GS.right += v; const sk = (GS.skills[A.skill] = GS.skills[A.skill] || [0, 0]); sk[0] += v; sk[1]++; }
-        showVerdict(A, g, tries);
+        showVerdict(A, g, tries, a, guessed1);
         const fbv = coachBox.querySelector(".fb.coach");
         if (fbv) fbv.append(flagCtl(firstId, `Hand ${G.handNo} · ${G.cash ? "cash" : "tournament"} · ${me.pos} · ${cardsTxt(me.cards)}${H.board.length ? " · board " + cardsTxt(H.board) : " · preflop"}`));
-        ctl.innerHTML = ""; prompt.innerHTML = ""; current.keys = {};
+        sheet.innerHTML = ""; current.keys = {};
         doAct(a); render(); step();
       };
-      for (const [label, a, key, cls] of opts) {
-        const b = h("button", { class: "btn" + (cls ? " " + cls : ""), html: label + (key ? `<kbd>${key.toUpperCase()}</kbd>` : "") });
-        b.onclick = () => choose(a); ctl.append(b);
-        if (key) current.keys[key] = () => choose(a);
+      let guessed1 = false;
+      const choose0 = a => { if (tries === 0) guessed1 = guess; choose(a); };
+      for (const o of base) {
+        const b = h("button", { class: "b " + o.cls, html: o.label + `<kbd>${o.key.toUpperCase()}</kbd>` });
+        b.onclick = () => choose0(o.a); acts.append(b); current.keys[o.key] = () => choose0(o.a);
       }
-      if (L.toCall === 0) current.keys.k = () => choose({ type: "check" });
+      if (raiseBtn) { raiseBtn.onclick = () => choose0(raises[sel].a); acts.append(raiseBtn); current.keys.r = () => choose0(raises[sel].a); }
+      raises.forEach(r => { current.keys[r.key] = () => choose0(r.a); });
+      if (L.toCall === 0) current.keys.k = () => choose0({ type: "check" });
       current.keys.g = gz.toggle;
     }
     // Everything the coach needs to review this decision later, captured before the action is applied.
@@ -980,20 +1027,54 @@
       return h("details", { class: "rng" }, h("summary", {}, `What ${vn} can have here · ${P(A.rangePct)} of hands`), g,
         h("div", { class: "gridkey" }, h("span", {}, h("i", { style: "background:var(--brass)" }), "in their range (paler = only some suits)"), h("span", {}, h("i", { style: "outline:2px solid var(--tx)" }), "your hand")));
     }
-    function showVerdict(A, g, tries) {
+    // What each choice was worth (bet-or-check spots against one player), or your equity vs the price (facing a bet).
+    function valueBlock(A, a) {
+      const bb = H.bl.bb, me = H.seats[0], n = TBLX.normalize(H, a);
+      if (A.opt && A.evCheck != null) {
+        const rows = [{ t: "Check", ev: A.evCheck, me: n.type === "check" }].concat(A.opt.map(o => ({ t: "Bet " + fmt(o.B), ev: o.ev, B: o.B })));
+        if (n.type === "raise") { const B = n.to - me.bet; rows.slice(1).reduce((x, y) => (Math.abs(y.B - B) < Math.abs(x.B - B) ? y : x)).me = true; }
+        const best = Math.max(...rows.map(r => r.ev)), scale = Math.max(bb, ...rows.map(r => best - r.ev));
+        const mine = rows.find(r => r.me), cost = mine ? (best - mine.ev) / bb : null;
+        const el = h("div", { class: "evb" }, h("div", { class: "lab" }, "What each choice was worth"),
+          h("div", { class: "ev" }, rows.map(r => {
+            const loss = best - r.ev, top = loss < 0.005 * bb;
+            return [h("span", { class: "n" + (r.me ? " y" : "") }, r.t + (r.me ? " · you" : "")),
+              h("div", { class: "trk" }, top ? h("span", { class: "best" }, "Best") : h("div", { class: "bar" + (r.me ? " y" : ""), style: `width:${Math.max(4, loss / scale * 100).toFixed(0)}%` })),
+              h("span", { class: "val" + (top ? " ok" : r.me ? " y" : "") }, top ? "0.0" : "−" + (loss / bb).toFixed(1))];
+          }).flat()),
+          n.type === "allin" ? h("p", { class: "evn" }, "You went all in, which is bigger than any of these.") : null);
+        return { el, cost };
+      }
+      if (A.eq != null && A.need != null && A.need > 0) {
+        const ok = A.eq >= A.need;
+        return { el: h("div", { class: "evb" }, h("div", { class: "lab" }, "Your share vs the price"),
+          h("div", { class: "eqm" }, h("div", { class: "trk" }, h("div", { class: "bar " + (ok ? "ok" : "no"), style: `width:${(A.eq * 100).toFixed(1)}%` }), h("i", { style: `left:${(A.need * 100).toFixed(1)}%` }))),
+          h("div", { class: "eqk" }, h("span", {}, "You win ", h("b", { class: ok ? "ok" : "no" }, P(A.eq))), h("span", {}, "You need ", h("b", {}, P(A.need))))), cost: null };
+      }
+      return { el: null, cost: null };
+    }
+    const mini = c => h("span", { class: "mini" + (isRed(c) ? " red" : "") + " s" + (c & 3) }, rankTxt(c >> 2) + GLYPH[c & 3]);
+    function showVerdict(A, g, tries, a, guessed) {
       coachBox.innerHTML = "";
-      const right = g !== "no", word = BEST_WORD[A.best] || A.best;
+      const right = g !== "no", word = BEST_WORD[A.best] || A.best, me = H.seats[0];
       const v = tries ? (right ? "Better." : "Still not it.") : g === "ok" ? "Right." : "Fine.";
       const cls = right ? (g === "ok" && !tries ? "ok" : "mid") : "no";
-      const fb = h("div", { class: "fb " + cls + " coach" }, h("div", { class: "v" }, v, h("span", { class: "best" }, A.best === "either" ? "Either is fine here" : "Best: " + word)));
-      const body = h("div", {}, A.lines.map(l => h("p", { class: "ln", html: l })), rangeBlock(A));
-      if (!tries && g === "ok") { const d = h("details", { class: "why" }, h("summary", {}, "Why"), body); fb.append(d); }
-      else fb.append(body);
-      if (g === "mid" && !tries) fb.append(h("p", { class: "ln k", html: `Not wrong, but <b>${word}</b> is better here.` }));
+      const vb = valueBlock(A, a);
+      const costEl = vb.cost == null ? null : vb.cost < 0.05 ? h("div", { class: "cost ok" }, h("b", {}, "Best play"))
+        : h("div", { class: "cost" + (g === "ok" ? " ok" : "") }, h("b", {}, `−${vb.cost.toFixed(1)} bb`), h("i", {}, g === "ok" ? "close enough to best" : "vs the best play"));
+      const sub = A.best === "either" ? "Either is fine here." : g === "mid" && !tries ? `Not wrong, but <b>${word}</b> is better here.` : `Best here: <b>${word}</b>.`;
+      const vil = A.villain != null && H.seats[A.villain] ? " vs " + H.seats[A.villain].pos : "";
+      const fb = h("div", { class: "fb " + cls + " coach" },
+        h("div", { class: "v" }, h("span", { class: "w" }, v), costEl),
+        h("div", { class: "vsub" }, h("span", { html: sub }), guessed ? h("span", { class: "gtag" }, "You were guessing") : null),
+        h("div", { class: "spot" }, me.cards.map(mini), h("span", {}, me.pos + vil + (H.board.length ? " · on" : " · preflop")), H.board.map(mini)),
+        vb.el);
+      const body = h("div", { class: "whyb" }, A.lines.map(l => h("p", { class: "ln", html: l })), rangeBlock(A));
+      fb.append(h("details", { class: "why", open: g === "ok" && !tries ? null : "" }, h("summary", {}, "Why"), body));
       coachBox.append(fb);
     }
     function handOver() {
-      render(); prompt.innerHTML = ""; ctl.innerHTML = "";
+      render(); sheet.innerHTML = "";
       GS.hands++; logHand();
       const r = H.result, lines = [];
       const winners = Object.keys(r.wins).map(Number);
@@ -1014,7 +1095,7 @@
       setTimeout(() => fb.scrollIntoView({ behavior: "smooth", block: "nearest" }), 60);
     }
     function gameOver() {
-      token++; coachBox.innerHTML = ""; endBox.innerHTML = ""; felt.innerHTML = ""; heroZ.innerHTML = ""; info.innerHTML = "";
+      token++; coachBox.innerHTML = ""; endBox.innerHTML = ""; felt.innerHTML = ""; sheet.innerHTML = ""; info.innerHTML = "";
       const place = G.places[0] || 1, paid = place <= TBLX.PAYOUT.length;
       if (!G.logged) { G.logged = true; COACH.rec("game", { mode: "tourney", game: G.key, place, hands: G.handNo, right: GS.right, n: GS.n }); }
       const fb = h("div", { class: "fb " + (paid ? "ok" : "no") }, h("div", { class: "v" }, `You finished ${ordinal(place)} of 6.`),
@@ -1030,7 +1111,7 @@
     function deal() {
       token++; coachBox.innerHTML = ""; endBox.innerHTML = ""; say = {}; seen = new Set();
       if (G.cash && G.players[0].stack === 0) {
-        felt.innerHTML = ""; heroZ.innerHTML = "";
+        felt.innerHTML = ""; sheet.innerHTML = "";
         const fb = h("div", { class: "fb no" }, h("div", { class: "v" }, "Out of chips."), h("p", { class: "ln", html: `In a cash game you can buy back in. That's another ${TBLX.CASH_BUYIN} (100 bb). Bankroll tip: keep at least 20 buy-ins for the stakes you play.` }));
         const b = h("button", { class: "btn" }, "Buy back in"); b.onclick = () => { G.players[0].stack = TBLX.CASH_BUYIN; G.buyins++; deal(); };
         fb.append(h("div", { class: "go" }, b)); endBox.append(fb); current.keys = { enter: () => b.click() }; return;
@@ -1213,6 +1294,16 @@
     return h("div", { class: "mstate" }, `${right}/${last.length}`);
   }
 
+  // Mastery ring for a drill tile: right answers out of the last WINDOW, green and full once solid.
+  function ringEl(id, no) {
+    const s = stat(id), last = s.hist.slice(-WINDOW), right = last.filter(Boolean).length, solid = solidOf(id), C = 87.96;
+    const col = solid ? "var(--ok)" : s.n ? "var(--brass)" : "var(--tx4)", dash = solid ? C : (right / WINDOW) * C;
+    return h("span", { class: "ring", html: `<svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="14" fill="none" stroke="var(--s3)" stroke-width="3"/><circle cx="17" cy="17" r="14" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${dash.toFixed(1)} ${C}" transform="rotate(-90 17 17)"/><text x="17" y="21" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" fill="${col}">${solid ? "✓" : String(no).padStart(2, "0")}</text></svg>` });
+  }
+  function ringText(id) {
+    const s = stat(id), last = s.hist.slice(-WINDOW), right = last.filter(Boolean).length;
+    return solidOf(id) ? "Solid" : !s.n ? "Not started" : `${right}/${last.length} right lately`;
+  }
   function home() {
     current = null; document.title = "Felt";
     app.innerHTML = "";
@@ -1223,9 +1314,12 @@
         h("div", {}, h("div", { class: "k" }, ns.n ? "Pick up where you left off" : "Start here"), h("div", { class: "t" }, `${String(idx).padStart(2, "0")} · ${nx.title}`), h("div", { class: "s" }, nx.skill)),
         h("span", { class: "btn" }, "Deal")));
     const lr = leakRows(true);
+    const live = G && !G.over;
     w.insertBefore(h("button", { class: "next table", onclick: () => { location.hash = "#/lobby"; } },
-      h("div", {}, h("div", { class: "k" }, G && !G.over ? "Your seat is still warm" : "Play"), h("div", { class: "t" }, "The table"), h("div", { class: "s" }, "Real hands, cash game or tournament, against five players. A coach checks every decision.")),
-      h("span", { class: "btn" }, "Sit")), w.querySelector(".next"));
+      h("div", { class: "tillu", "aria-hidden": "true", html: '<div class="mr"><div class="mf"><div class="mcs"><i>K<br>♠</i><i class="red">9<br>♥</i><i>4<br>♣</i></div><div class="mch"><b style="--c:var(--ch5)"></b><b style="--c:var(--ch5)"></b><b style="--c:var(--ch25)"></b></div></div></div>' }),
+      h("div", { class: "tb" }, h("div", {}, h("div", { class: "k" }, live ? "Your seat is still warm" : "Play"), h("div", { class: "t" }, "The table"),
+        h("div", { class: "s" }, live ? `${G.cash ? "Cash game, blinds 1/2" : "Tournament"} · hand ${G.handNo}` : "Real hands against five players. A coach checks every decision.")),
+        h("span", { class: "btn" }, live ? "Sit down" : "Sit"))), w.querySelector(".next"));
     w.querySelector(".next:not(.table) .k").textContent = ns.n ? "Practice reps · pick up where you left off" : "Practice reps · start here";
     w.querySelector(".mast").after(syncPill());
     const tcard = w.querySelector(".next.table"), pc = planCard(), fr = flagsRow();
@@ -1235,13 +1329,13 @@
     for (const a of [1, 2, 3]) {
       const [num, name, lede] = ACTS[a];
       const sec = h("section", { class: "act" }, h("h2", {}, h("i", {}, "ACT " + num), name), h("p", { class: "lede" }, lede));
+      const tiles = h("div", { class: "tiles" });
       DRILLS.forEach((d, k) => {
         if (d.act !== a) return;
-        sec.append(h("button", { class: "row" + (d === nx ? " is-next" : ""), onclick: () => go(d.id) },
-          h("span", { class: "n" }, String(k + 1).padStart(2, "0")),
-          h("div", {}, h("div", { class: "t" }, d.title), h("div", { class: "s" }, d.skill)),
-          h("div", {}, pips(d.id), mstate(d.id))));
+        tiles.append(h("button", { class: "tile" + (d === nx ? " is-next" : ""), onclick: () => go(d.id) }, ringEl(d.id, k + 1),
+          h("span", { class: "tt" }, h("span", { class: "nm" }, d.title), h("span", { class: "ss" }, ringText(d.id)))));
       });
+      sec.append(tiles);
       w.append(sec);
     }
     const solid = DRILLS.filter(d => solidOf(d.id)).length;

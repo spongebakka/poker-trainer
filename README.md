@@ -43,7 +43,10 @@ rendered to PNG with headless Chrome + `sips`.
   spongebakka/felt-data with a fine-grained token Kai pastes in at `#/sync`, and pulls
   `coach/plan.json` + `coach/replies.json` back. Its `APP` must equal `VERSION` in sw.js (tested).
   Full spec: `docs/COACHING.md`. Coaching sessions: `node tools/review.js ../felt-data`.
-- `app.js`: UI shell + the 13 drills + the table screen (lobby, table, coach panel). Each drill is one `def({...})` block with an
+- `app.js`: UI shell + the 13 drills + the table screen (lobby, table, coach panel). The table is a portrait oval
+  (seat, bet and dealer spots in `TSEAT`/`TBET`/`TDLR`, % of the table box), with an action sheet under it: stat tiles,
+  raise-size picker, then Fold / Call / Raise. The verdict shows what each choice was worth (bet-or-check spots) or
+  your share vs the price (facing a bet). Drills still use the landscape `SEAT_XY`. Each drill is one `def({...})` block with an
   `idea` (the teaching text) and `run(ctx)` (deal a spot, grade it, explain it).
 - `style.css`, `fonts.css`: look and feel. Fonts are embedded (same three as the
   blackjack trainer) so it works offline.
