@@ -561,3 +561,12 @@ html:has(.tview),body:has(.tview){overflow:hidden;overscroll-behavior:none}
 .ovb details.rng summary{cursor:pointer;font:500 11px var(--mn);color:var(--brass2);letter-spacing:.06em;text-transform:uppercase;margin:6px 0 8px}
 .tsheet .fb.coach{padding:0;background:none;border-radius:0}
 .ptable .say{z-index:3}
+/* the panel is one fixed height in every stage, so the table never changes size mid-hand */
+.tview .tsheet{height:calc(280px + env(safe-area-inset-bottom));min-height:0;max-height:none;overflow-y:auto}
+.tsheet > .acts{margin-top:auto}
+.tsheet .fb{flex:1 0 auto;display:flex;flex-direction:column}
+.tsheet .fb .acts{margin-top:auto;padding-top:12px}
+.tsheet .fb.coach .v{font-size:32px}
+.hintb{max-height:80px;overflow-y:auto}
+.tview .bar .ttl .tinfo{height:2.6em;overflow:hidden}
+.pseat:has(.pcards.face){z-index:4}
