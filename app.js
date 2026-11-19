@@ -819,11 +819,11 @@
     document.title = (G.cash ? "Cash game" : "Tournament") + " · Felt";
     app.innerHTML = "";
     const score = h("div", { class: "score" }), info = h("div", { class: "tinfo" });
-    const felt = h("div", { class: "ptable" }), sheet = h("div", { class: "tsheet" }), coachBox = h("div", { class: "tcoach" }), endBox = h("div");
+    const felt = h("div", { class: "ptable" }), sheet = h("div", { class: "tsheet" }), coachBox = sheet, endBox = sheet; // one panel under the table holds everything
     const w = h("div", { class: "wrap tview" },
       h("div", { class: "bar" }, h("button", { class: "back", onclick: () => { token++; lobby(); history.replaceState(null, "", "#/lobby"); }, "aria-label": "Back" }, "←"),
         h("div", { class: "ttl" }, G.cash ? "Cash game" : "Tournament", info), score),
-      h("div", { class: "pwrap" }, felt), sheet, coachBox, endBox);
+      h("div", { class: "pwrap" }, felt), sheet);
     app.append(w);
     let H = null, say = {}, token = 0, seen = new Set();
     current = { keys: {} };
@@ -913,8 +913,6 @@
       render();
       const L = TBLX.legal(H), bb = H.bl.bb, me = H.seats[0];
       const A = TBLX.coach(H); let tries = 0, guess = false, firstId = null, t0 = Date.now();
-      const old = coachBox.querySelector(".fb.coach");
-      if (old && !old.classList.contains("old")) { old.classList.add("old"); const v = old.querySelector(".v"); v.prepend(h("span", { class: "lastk" }, "Last decision · ")); v.onclick = () => old.classList.toggle("open"); }
       // the move: fold / call or check / raise, with the raise sizes picked above the buttons
       const base = [];
       if (L.toCall > 0) base.push({ label: "Fold", a: { type: "fold" }, key: "f", cls: "fo" });
@@ -967,17 +965,13 @@
         gz.reset(); t0 = Date.now();
         if (tries === 0 && g === "no") {
           tries = 1; skillHit(A.skill, 0); GS.n++; (GS.skills[A.skill] = GS.skills[A.skill] || [0, 0])[1]++; updScore();
-          coachBox.querySelectorAll(".fb.old").forEach(x => x.remove());
-          coachBox.append(h("div", { class: "fb mid hint" }, h("div", { class: "v" }, "Hold on."), h("p", { class: "ln", html: A.hint }), h("p", { class: "ln k", html: "Have another go. Your first answer is already counted." })));
-          setTimeout(() => coachBox.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+          sheet.querySelector(".stats, .hintb").replaceWith(h("div", { class: "hintb" }, h("b", {}, "Hold on. "), h("span", { html: A.hint }), h("span", { class: "k" }, " Have another go. Your first answer is already counted.")));
           return;
         }
         if (tries === 0) { const v = g === "no" ? 0 : 1; skillHit(A.skill, v); GS.n++; GS.right += v; const sk = (GS.skills[A.skill] = GS.skills[A.skill] || [0, 0]); sk[0] += v; sk[1]++; }
-        showVerdict(A, g, tries, a, guessed1);
-        const fbv = coachBox.querySelector(".fb.coach");
-        if (fbv) fbv.append(flagCtl(firstId, `Hand ${G.handNo} · ${G.cash ? "cash" : "tournament"} · ${me.pos} · ${cardsTxt(me.cards)}${H.board.length ? " · board " + cardsTxt(H.board) : " · preflop"}`));
-        sheet.innerHTML = ""; current.keys = {};
-        doAct(a); render(); step();
+        const flag = flagCtl(firstId, `Hand ${G.handNo} · ${G.cash ? "cash" : "tournament"} · ${me.pos} · ${cardsTxt(me.cards)}${H.board.length ? " · board " + cardsTxt(H.board) : " · preflop"}`);
+        showVerdict(A, g, tries, a, guessed1, flag, () => step()); // built before the action is applied: it reads the spot as it was
+        doAct(a); render();
       };
       let guessed1 = false;
       const choose0 = a => { if (tries === 0) guessed1 = guess; choose(a); };
@@ -1039,7 +1033,7 @@
           h("div", { class: "ev" }, rows.map(r => {
             const loss = best - r.ev, top = loss < 0.005 * bb;
             return [h("span", { class: "n" + (r.me ? " y" : "") }, r.t + (r.me ? " · you" : "")),
-              h("div", { class: "trk" }, top ? h("span", { class: "best" }, "Best") : h("div", { class: "bar" + (r.me ? " y" : ""), style: `width:${Math.max(4, loss / scale * 100).toFixed(0)}%` })),
+              h("div", { class: "trk" }, top ? h("span", { class: "best" }, "Best") : h("div", { class: "evbar" + (r.me ? " y" : ""), style: `width:${Math.max(4, loss / scale * 100).toFixed(0)}%` })),
               h("span", { class: "val" + (top ? " ok" : r.me ? " y" : "") }, top ? "0.0" : "−" + (loss / bb).toFixed(1))];
           }).flat()),
           n.type === "allin" ? h("p", { class: "evn" }, "You went all in, which is bigger than any of these.") : null);
@@ -1048,14 +1042,22 @@
       if (A.eq != null && A.need != null && A.need > 0) {
         const ok = A.eq >= A.need;
         return { el: h("div", { class: "evb" }, h("div", { class: "lab" }, "Your share vs the price"),
-          h("div", { class: "eqm" }, h("div", { class: "trk" }, h("div", { class: "bar " + (ok ? "ok" : "no"), style: `width:${(A.eq * 100).toFixed(1)}%` }), h("i", { style: `left:${(A.need * 100).toFixed(1)}%` }))),
+          h("div", { class: "eqm" }, h("div", { class: "trk" }, h("div", { class: "evbar " + (ok ? "ok" : "no"), style: `width:${(A.eq * 100).toFixed(1)}%` }), h("i", { style: `left:${(A.need * 100).toFixed(1)}%` }))),
           h("div", { class: "eqk" }, h("span", {}, "You win ", h("b", { class: ok ? "ok" : "no" }, P(A.eq))), h("span", {}, "You need ", h("b", {}, P(A.need))))), cost: null };
       }
       return { el: null, cost: null };
     }
     const mini = c => h("span", { class: "mini" + (isRed(c) ? " red" : "") + " s" + (c & 3) }, rankTxt(c >> 2) + GLYPH[c & 3]);
-    function showVerdict(A, g, tries, a, guessed) {
-      coachBox.innerHTML = "";
+    // Full-screen sheet for the long explanation, so the play screen never has to scroll.
+    function overlay(title, kids) {
+      const close = () => { o.remove(); window.removeEventListener("hashchange", close); };
+      const o = h("div", { class: "ovl", onclick: e => { if (e.target === o) close(); } },
+        h("div", { class: "ovs", role: "dialog", "aria-label": title }, h("div", { class: "ovh" }, h("b", {}, title), h("button", { class: "ovx", type: "button", "aria-label": "Close", onclick: close }, "×")), h("div", { class: "ovb" }, kids)));
+      window.addEventListener("hashchange", close);
+      document.body.append(o);
+    }
+    function showVerdict(A, g, tries, a, guessed, flag, onNext) {
+      sheet.innerHTML = "";
       const right = g !== "no", word = BEST_WORD[A.best] || A.best, me = H.seats[0];
       const v = tries ? (right ? "Better." : "Still not it.") : g === "ok" ? "Right." : "Fine.";
       const cls = right ? (g === "ok" && !tries ? "ok" : "mid") : "no";
@@ -1064,14 +1066,16 @@
         : h("div", { class: "cost" + (g === "ok" ? " ok" : "") }, h("b", {}, `−${vb.cost.toFixed(1)} bb`), h("i", {}, g === "ok" ? "close enough to best" : "vs the best play"));
       const sub = A.best === "either" ? "Either is fine here." : g === "mid" && !tries ? `Not wrong, but <b>${word}</b> is better here.` : `Best here: <b>${word}</b>.`;
       const vil = A.villain != null && H.seats[A.villain] ? " vs " + H.seats[A.villain].pos : "";
-      const fb = h("div", { class: "fb " + cls + " coach" },
+      const whyEls = [h("div", { class: "spot" }, me.cards.map(mini), h("span", {}, me.pos + vil + (H.board.length ? " · on" : " · preflop")), H.board.map(mini)),
+        h("div", { class: "whyb" }, A.lines.map(l => h("p", { class: "ln", html: l })), rangeBlock(A)), flag];
+      const why = h("button", { class: "b fo", type: "button" }, "Why", h("kbd", {}, "W")), nx = h("button", { class: "b ra", type: "button" }, "Continue", h("kbd", {}, "↵"));
+      const openWhy = () => overlay("Why", whyEls), go = () => { current.keys = {}; sheet.innerHTML = ""; onNext(); };
+      why.onclick = openWhy; nx.onclick = go;
+      sheet.append(h("div", { class: "fb " + cls + " coach" },
         h("div", { class: "v" }, h("span", { class: "w" }, v), costEl),
         h("div", { class: "vsub" }, h("span", { html: sub }), guessed ? h("span", { class: "gtag" }, "You were guessing") : null),
-        h("div", { class: "spot" }, me.cards.map(mini), h("span", {}, me.pos + vil + (H.board.length ? " · on" : " · preflop")), H.board.map(mini)),
-        vb.el);
-      const body = h("div", { class: "whyb" }, A.lines.map(l => h("p", { class: "ln", html: l })), rangeBlock(A));
-      fb.append(h("details", { class: "why", open: g === "ok" && !tries ? null : "" }, h("summary", {}, "Why"), body));
-      coachBox.append(fb);
+        vb.el, h("div", { class: "acts", style: "grid-template-columns:1fr 2fr" }, why, nx)));
+      current.keys = { enter: go, " ": go, w: openWhy };
     }
     function handOver() {
       render(); sheet.innerHTML = "";
@@ -1086,13 +1090,12 @@
       if (H.ranOut) lines.push("All in, so the rest of the board was dealt out.");
       if (r.shown.length > 1) lines.push(`<span class="k2">At showdown, the last player to bet or raise shows first. If nobody bet on the river, the first player left of the button shows first.</span>`);
       const fb = h("div", { class: "fb end" }, h("div", { class: "v" }, winners.includes(0) ? "Your pot." : "Hand over."), lines.map(l => h("p", { class: "ln", html: l })));
-      const nb = h("button", { class: "btn" }, G.over ? "See how you did" : "Next hand", h("kbd", {}, "↵"));
+      const nb = h("button", { class: "b ra" }, G.over ? "See how you did" : "Next hand", h("kbd", {}, "↵"));
       const next = () => (G.over ? gameOver() : deal());
       if (H.seats[0]) fb.append(flagCtl(H.key, `Hand ${G.handNo} · ${G.cash ? "cash" : "tournament"} · ${cardsTxt(H.seats[0].cards)} · the whole hand`));
-      nb.onclick = next; fb.append(h("div", { class: "go" }, nb));
+      nb.onclick = next; fb.append(h("div", { class: "acts" }, nb));
       endBox.innerHTML = ""; endBox.append(fb);
       current.keys = { enter: next, " ": next };
-      setTimeout(() => fb.scrollIntoView({ behavior: "smooth", block: "nearest" }), 60);
     }
     function gameOver() {
       token++; coachBox.innerHTML = ""; endBox.innerHTML = ""; felt.innerHTML = ""; sheet.innerHTML = ""; info.innerHTML = "";
