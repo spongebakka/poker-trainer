@@ -3,7 +3,7 @@
 // Works offline: records wait in an outbox in localStorage and upload when there's signal.
 (function () {
   "use strict";
-  const APP = "felt-7"; // keep equal to VERSION in sw.js (npm test checks)
+  const APP = "felt-10"; // keep equal to VERSION in sw.js (npm test checks)
   const SCHEMA = 1, REPO = "spongebakka/felt-data", API = "https://api.github.com/repos/" + REPO;
   const KEY = "felt_coach_v1";
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };

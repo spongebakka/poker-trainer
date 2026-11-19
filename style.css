@@ -580,3 +580,54 @@ html:has(.tview),body:has(.tview){overflow:hidden;overscroll-behavior:none}
 .wrap.tview{--tw:min(calc(100vw - 32px),400px,calc((100svh - 392px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * .697))}
 .tview .pwrap{container-type:normal}
 .tview .ptable{width:var(--tw)}
+/* hero cards scale with the table (a share of its width), not a fixed size */
+.tview .ptable{container-type:inline-size}
+.phero{top:78%}
+.phero .card{--cw:16cqw;border-radius:calc(var(--cw)*.12)}
+.phero .card+.card{margin-left:calc(var(--cw)*-.18);margin-top:calc(var(--cw)*.05)}
+.phero .card .rk{font-size:calc(var(--cw)*.42);left:calc(var(--cw)*.1);top:calc(var(--cw)*.09)}
+.phero .card .su{font-size:calc(var(--cw)*.28);left:calc(var(--cw)*.12);top:calc(var(--cw)*.52)}
+.phero .card .pip{font-size:calc(var(--cw)*.5);right:calc(var(--cw)*.09);bottom:calc(var(--cw)*.06)}
+.pme{left:66.5%;top:81%}
+/* board scales with the table too, so all five cards always fit */
+.pboard{gap:1.5cqw}
+.pboard .card{--cw:12.3cqw}
+.pboard .slot{width:12.3cqw;height:calc(12.3cqw * 1.4)}
+/* give the table more room: slimmer panel and top gap */
+.wrap.tview{--tw:min(calc(100vw - 32px),400px,calc((100svh - 368px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * .697))}
+.tview .ptable{top:34px}
+.tview .tsheet{height:calc(264px + env(safe-area-inset-bottom));gap:8px;padding-top:10px}
+.tsheet .fb.coach .v{font-size:30px}
+.ev .trk{height:12px}
+.tsheet .evb{margin-top:10px}
+.tsheet .evb .lab{margin-bottom:6px}
+.tsheet .ev{row-gap:3px}
+.tsheet .fb .acts{padding-top:10px}
+.tsheet .fb .acts .b{height:50px}
+.tsheet .vsub{margin-top:6px}
+.tsheet .fb.end .v{font-size:26px;margin-bottom:6px}
+.tsheet .fb .ln{font-size:13.5px;margin-bottom:4px;line-height:1.4}
+.tsheet .fb .ln .k2{font-size:12px}
+.tsheet .flagbox{margin-top:4px}
+.tsheet .fb.end .acts{padding-top:6px}
+
+/* ===== table as one scaled picture (felt-10). Everything inside is in design px at 358 x 514. ===== */
+.wrap.tview{position:relative}
+.tview .pwrap{flex:1 1 auto;min-height:0;container-type:normal;margin-bottom:calc(196px + env(safe-area-inset-bottom))}
+.tview .ptable{position:absolute;left:50%;top:34px;width:358px;height:514px;aspect-ratio:auto;container-type:normal;
+  transform:translateX(-50%) scale(var(--k,1));transform-origin:50% 0}
+.phero .card{--cw:60px}
+.pme{left:68%}
+.pboard{gap:6px}
+.pboard .card{--cw:44px}
+.pboard .slot{width:44px;height:62px}
+/* the panel sits on the bottom edge; taller content (verdict, hint, result) slides up over the table, which never moves */
+.tview .tsheet{position:absolute;left:0;right:0;bottom:0;margin:0;height:auto;min-height:calc(196px + env(safe-area-inset-bottom));max-height:70%;z-index:8;overflow-y:auto}
+.tsheet .rowa{min-height:44px}
+.facts{font:500 13px/1.35 var(--mn);color:var(--tx3)}
+.facts b{color:var(--tx);font-weight:600;font-size:15px}
+.tsheet .hintb{max-height:none}
+.tsheet .rowa{gap:8px}
+.facts{font-size:12px;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.facts b{font-size:14px}
+.tsheet .guess{flex:none;white-space:nowrap;padding:0 12px 0 8px;gap:7px;font-size:12.5px}

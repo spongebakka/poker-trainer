@@ -82,7 +82,7 @@
     let left = amount, cols = 0;
     denoms.forEach((d, k) => {
       let n = Math.floor(left / d + 1e-9); left -= n * d;
-      while (n > 0 && cols < 6) {
+      while (n > 0 && cols < (o.maxCols || 6)) {
         const take = Math.min(n, 9); n -= take; cols++;
         const st = h("div", { class: "stack" });
         for (let i = 0; i < take; i++) st.append(h("i", { class: "chip" + (i === take - 1 ? " top" : ""), style: `--c:${CHIP_COL[k]}` }));
@@ -825,6 +825,11 @@
         h("div", { class: "ttl" }, G.cash ? "Cash game" : "Tournament", info), score),
       h("div", { class: "pwrap" }, felt), sheet);
     app.append(w);
+    // The table is drawn at one design size (358 x 514) and scaled as a whole to fit the screen,
+    // so seats, chips and cards always keep the mockup's proportions. Only a screen-size change rescales it.
+    const fit = () => { const pw = felt.parentElement; if (!pw.isConnected) return ro.disconnect();
+      felt.style.setProperty("--k", Math.max(0.45, Math.min(pw.clientWidth / 358, 1.15, (pw.clientHeight - 34) / 514)).toFixed(4)); };
+    const ro = new ResizeObserver(fit); ro.observe(felt.parentElement); fit();
     let H = null, say = {}, token = 0, seen = new Set();
     current = { keys: {} };
     const updScore = () => { score.innerHTML = `<b>${GS.right}</b>/${GS.n} · hand <b>${G.handNo}</b>`; };
@@ -842,7 +847,7 @@
       let bets = 0;
       TSEAT.forEach((xy, s) => {
         const p = G.players[s], hs = H.seats[s];
-        if (hs && hs.bet > 0) { bets += hs.bet; felt.append(h("div", { class: "pbet", style: pct(TBET[s]) }, chipsEl(hs.bet, { denoms: denoms(), label: fmt(hs.bet) }))); }
+        if (hs && hs.bet > 0) { bets += hs.bet; felt.append(h("div", { class: "pbet", style: pct(TBET[s]) }, chipsEl(hs.bet, { denoms: denoms(), label: fmt(hs.bet), maxCols: 3 }))); }
         if (s === 0) return;
         const side = xy[0] > 50 ? " rt" : "";
         if (!hs) {
@@ -861,7 +866,7 @@
       });
       felt.append(h("div", { class: "dbtn", style: pct(TDLR[G.btn]) }, "D"));
       const pot = H.over ? 0 : TBLX.potTotal(H);
-      felt.append(h("div", { class: "ppot" }, pot - bets > 0 ? chipsEl(pot - bets, { denoms: denoms(), label: false }) : null,
+      felt.append(h("div", { class: "ppot" }, pot - bets > 0 ? chipsEl(pot - bets, { denoms: denoms(), label: false, maxCols: 3 }) : null,
         pot ? h("div", {}, h("i", {}, "Pot"), h("b", {}, fmt(pot)), h("span", {}, bbTxt(pot))) : null));
       const board = h("div", { class: "pboard" });
       for (let k = 0; k < 5; k++) {
@@ -899,7 +904,7 @@
     }
     const pause = ms => { const t = token; return new Promise(r => setTimeout(() => r(t === token), ms)); };
     // While the others act, the panel stays up (an empty panel would let the table jump in size).
-    let skip = false, waitH = null;
+    let skip = false, waitH = null, orderTip = false; // the "who shows first" tip appears once per sitting
     function waitPanel() {
       const heroIn = H.seats[0] && !H.seats[0].folded;
       if (!sheet.childElementCount || (waitH && waitH.dataset.in !== String(heroIn))) {
@@ -952,14 +957,11 @@
       }
       const gz = guessToggle(v => { guess = v; });
       sheet.innerHTML = ""; current.keys = {};
-      const tile = (k, v, sm, extra) => h("div", { class: "st" }, h("i", {}, k), h("b", {}, v), sm ? h("small", {}, sm) : null, extra || null);
       const showNeed = L.toCall && (H.street > 0 || H.curBet > bb), need = L.toCall / (L.pot + L.toCall);
       const live = H.order.filter(s => !H.seats[s].folded).length;
-      const tiles = L.toCall
-        ? [tile("To call", fmt(L.toCall), bbTxt(L.toCall)), tile("Pot", fmt(L.pot), bbTxt(L.pot)),
-          showNeed ? tile("You need", P(need), null, h("div", { class: "nm" }, h("span", { style: `width:${(need * 100).toFixed(1)}%` }))) : tile("Behind", fmt(me.stack), bbTxt(me.stack))]
-        : [tile("Pot", fmt(L.pot), bbTxt(L.pot)), tile("Behind", fmt(me.stack), bbTxt(me.stack)), tile("Players", String(live), H.street ? "still in" : "in the hand")];
-      sheet.append(h("div", { class: "rowa" }, h("h2", {}, "Your move"), gz.el), h("div", { class: "stats" }, tiles));
+      const facts = L.toCall ? `<b>${fmt(L.toCall)}</b> to call · pot <b>${fmt(L.pot)}</b>${showNeed ? ` · need <b>${P(need)}</b>` : ` · ${bbTxt(L.toCall)}`}`
+        : `pot <b>${fmt(L.pot)}</b> · ${bbTxt(L.pot)} · <b>${live}</b> in`;
+      sheet.append(h("div", { class: "rowa" }, h("div", { class: "facts", html: facts }), gz.el));
       let sel = 0;
       const raiseBtn = raises.length ? h("button", { class: "b ra" }) : null;
       const sizeBtns = raises.map((r, i) => {
@@ -980,7 +982,7 @@
         gz.reset(); t0 = Date.now();
         if (tries === 0 && g === "no") {
           tries = 1; skillHit(A.skill, 0); GS.n++; (GS.skills[A.skill] = GS.skills[A.skill] || [0, 0])[1]++; updScore();
-          sheet.querySelector(".stats, .hintb").replaceWith(h("div", { class: "hintb" }, h("b", {}, "Hold on. "), h("span", { html: A.hint }), h("span", { class: "k" }, " Have another go. Your first answer is already counted.")));
+          sheet.querySelector(".rowa, .hintb").replaceWith(h("div", { class: "hintb" }, h("b", {}, "Hold on. "), h("span", { html: A.hint }), h("span", { class: "k" }, " Have another go. Your first answer is already counted.")));
           return;
         }
         if (tries === 0) { const v = g === "no" ? 0 : 1; skillHit(A.skill, v); GS.n++; GS.right += v; const sk = (GS.skills[A.skill] = GS.skills[A.skill] || [0, 0]); sk[0] += v; sk[1]++; }
@@ -1049,7 +1051,7 @@
             const loss = best - r.ev, top = loss < 0.005 * bb;
             return [h("span", { class: "n" + (r.me ? " y" : "") }, r.t + (r.me ? " · you" : "")),
               h("div", { class: "trk" }, top ? h("span", { class: "best" }, "Best") : h("div", { class: "evbar" + (r.me ? " y" : ""), style: `width:${Math.max(4, loss / scale * 100).toFixed(0)}%` })),
-              h("span", { class: "val" + (top ? " ok" : r.me ? " y" : "") }, top ? "0.0" : "−" + (loss / bb).toFixed(1))];
+              h("span", { class: "val" + (top ? " ok" : r.me ? " y" : "") }, top || loss / bb < 0.05 ? "0.0" : "−" + (loss / bb).toFixed(1))];
           }).flat()),
           n.type === "allin" ? h("p", { class: "evn" }, "You went all in, which is bigger than any of these.") : null);
         return { el, cost };
@@ -1103,7 +1105,7 @@
       }
       if (r.shown.length) for (const s of r.shown) if (!winners.includes(s)) lines.push(`${s === 0 ? "You" : G.players[s].name} showed ${cardsTxt(H.seats[s].cards)}: ${PE.describe(r.scores[s]).replace(/^./, m => m.toLowerCase())}.`);
       if (H.ranOut) lines.push("All in, so the rest of the board was dealt out.");
-      if (r.shown.length > 1) lines.push(`<span class="k2">At showdown, the last player to bet or raise shows first. If nobody bet on the river, the first player left of the button shows first.</span>`);
+      if (r.shown.length > 1 && !orderTip && (orderTip = true)) lines.push(`<span class="k2">At showdown, the last player to bet or raise shows first. If nobody bet on the river, the first player left of the button shows first.</span>`);
       const fb = h("div", { class: "fb end" }, h("div", { class: "v" }, winners.includes(0) ? "Your pot." : "Hand over."), lines.map(l => h("p", { class: "ln", html: l })));
       const nb = h("button", { class: "b ra" }, G.over ? "See how you did" : "Next hand", h("kbd", {}, "↵"));
       const next = () => (G.over ? gameOver() : deal());
