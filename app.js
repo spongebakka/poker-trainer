@@ -898,14 +898,29 @@
       if (H.street !== st && !H.over) say = {};
     }
     const pause = ms => { const t = token; return new Promise(r => setTimeout(() => r(t === token), ms)); };
+    // While the others act, the panel stays up (an empty panel would let the table jump in size).
+    let skip = false, waitH = null;
+    function waitPanel() {
+      const heroIn = H.seats[0] && !H.seats[0].folded;
+      if (!sheet.childElementCount || (waitH && waitH.dataset.in !== String(heroIn))) {
+        sheet.innerHTML = "";
+        waitH = h("h2", { "data-in": String(heroIn) });
+        const p = h("div", { class: "waitp" }, waitH, h("p", {}, heroIn ? "Watch what they do. It tells you about their hand." : "You're out of this one. Watch how it plays out, or skip ahead."));
+        if (!heroIn) { const b = h("button", { class: "b fo", type: "button" }, "Skip ahead", h("kbd", {}, "↵")); const go = () => { skip = true; b.disabled = true; }; b.onclick = go; current.keys = { enter: go, " ": go }; p.append(h("div", { class: "acts" }, b)); }
+        sheet.append(p);
+      }
+      if (waitH && H.toAct != null && G.players[H.toAct]) waitH.textContent = `${G.players[H.toAct].name} to act…`;
+    }
     async function step() {
       while (H && !H.over && H.toAct !== 0) {
         const heroIn = H.seats[0] && !H.seats[0].folded;
         const st = H.street;
-        if (!(await pause(heroIn ? 650 : 260))) return;
+        waitPanel();
+        if (!(await pause(skip ? 0 : heroIn ? 650 : 260))) return;
         doAct(TBLX.botAction(H)); render();
-        if (H.street !== st && !H.over && !(await pause(heroIn ? 350 : 120))) return;
+        if (H.street !== st && !H.over && !(await pause(skip ? 0 : heroIn ? 350 : 120))) return;
       }
+      waitH = null;
       if (H.over) return handOver();
       heroTurn();
     }
@@ -1112,7 +1127,7 @@
       endBox.append(fb); current.keys = { enter: () => again.click() };
     }
     function deal() {
-      token++; coachBox.innerHTML = ""; endBox.innerHTML = ""; say = {}; seen = new Set();
+      token++; coachBox.innerHTML = ""; endBox.innerHTML = ""; say = {}; seen = new Set(); skip = false; waitH = null;
       if (G.cash && G.players[0].stack === 0) {
         felt.innerHTML = ""; sheet.innerHTML = "";
         const fb = h("div", { class: "fb no" }, h("div", { class: "v" }, "Out of chips."), h("p", { class: "ln", html: `In a cash game you can buy back in. That's another ${TBLX.CASH_BUYIN} (100 bb). Bankroll tip: keep at least 20 buy-ins for the stakes you play.` }));

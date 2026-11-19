@@ -570,3 +570,13 @@ html:has(.tview),body:has(.tview){overflow:hidden;overscroll-behavior:none}
 .hintb{max-height:80px;overflow-y:auto}
 .tview .bar .ttl .tinfo{height:2.6em;overflow:hidden}
 .pseat:has(.pcards.face){z-index:4}
+.tview .tsheet:empty{display:flex}
+.waitp{flex:1 0 auto;display:flex;flex-direction:column}
+.waitp h2{margin:6px 0 6px;font:400 26px/1.1 var(--dp);color:var(--tx2)}
+.waitp p{margin:0;font-size:13.5px;color:var(--tx3)}
+.waitp .acts{margin-top:auto}
+.acts .b[disabled]{opacity:.4}
+/* The table's size comes from the screen size only, never from what's in the panel: set once, never moves. */
+.wrap.tview{--tw:min(calc(100vw - 32px),400px,calc((100svh - 392px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * .697))}
+.tview .pwrap{container-type:normal}
+.tview .ptable{width:var(--tw)}
