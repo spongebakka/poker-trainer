@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever a file below changes, so phones pick up the new build.
-const VERSION = "felt-11";
+const VERSION = "felt-12";
 const FILES = ["./", "index.html", "fonts.css", "style.css", "engine.js", "data.js", "table.js", "coach.js", "app.js",
   "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 // GitHub Pages lets browsers keep files for 10 minutes, so always go past that cache ("reload" / "no-cache"),

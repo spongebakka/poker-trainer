@@ -92,6 +92,64 @@ const aa = spotOpen("Ah Ad", "UTG"), junk = spotOpen("7h 2d", "UTG");
 ok(aa && aa.accept.raise === "ok" && !aa.accept.fold, "AA under the gun: raise");
 ok(junk && junk.accept.fold === "ok" && !junk.accept.raise, "72o under the gun: fold");
 
+// --- limpers: some bot styles open-limp, and the coach grades the spot ---
+{
+  const first = {}, limps = {};
+  for (let seed = 201; seed <= 260; seed++) {
+    const g = T.newGame("cash", seed); g.players[0].style = T.BOTS[1];
+    for (let n = 0; n < 60; n++) {
+      const H = T.newHand(g); if (!H) break; let steps = 0;
+      while (!H.over && steps++ < 300) {
+        const s = H.toAct, sit = T.situation(H, s), a = T.botAction(H), st = g.players[s].style;
+        if (s && H.street === 0 && sit.raises === 0 && sit.toCall > 0 && sit.S > 12 && a.type !== "fold") {
+          first[st.tag] = (first[st.tag] || 0) + 1; if (a.type === "call") limps[st.tag] = (limps[st.tag] || 0) + 1;
+        }
+        T.act(H, a);
+      }
+    }
+  }
+  const rate = t => (limps[t] || 0) / (first[t] || 1);
+  ok(!limps.TAG && !limps.nit, "TAGs and nits never limp: " + JSON.stringify(limps));
+  ok(rate("calling station") > 0.4 && rate("calling station") < 0.8, "the calling station limps most hands she plays: " + rate("calling station").toFixed(2));
+  ok(rate("LAG") > 0.03 && rate("LAG") < 0.2, "LAGs limp now and then: " + rate("LAG").toFixed(2));
+}
+// Hero on `pos` with `k` limpers in front (everyone else before the hero folds).
+function spotLimp(cards, pos, k, mode) {
+  for (let seed = 1; seed < 2000; seed++) {
+    const g = T.newGame(mode || "cash", seed); const H = T.newHand(g);
+    if (H.n !== 6 || H.seats[0].pos !== pos) continue;
+    let limped = 0;
+    while (H.toAct !== 0) { const p = H.seats[H.toAct]; T.act(H, limped < k && p.pos !== "SB" ? (limped++, { type: "call" }) : { type: "fold" }); }
+    if (limped !== k) continue;
+    H.seats[0].cards = P(cards);
+    return { H, A: T.coach(H) };
+  }
+}
+{
+  const bb = 2, gr = (x, a) => T.grade(x.H, x.A, a);
+  const aa = spotLimp("Ah Ad", "BTN", 2), sp = aa.A;
+  ok(sp.spot === "limpers" && sp.skill === "vsLimp" && T.SKILLS.vsLimp, "two limpers in front: the limpers spot, own skill");
+  ok(sp.accept.raise === "ok" && !sp.accept.call && sp.best === "raise", "AA behind limpers: isolation raise, never limp");
+  ok(gr(aa, { type: "raise", to: 4.5 * bb }) === "ok", "AA: raise to 2.5 bb + 1 per limper = 4.5 bb is right");
+  ok(gr(aa, { type: "raise", to: 2.5 * bb }) === "mid", "AA: a normal 2.5 bb open over two limpers is too small");
+  ok(gr(aa, { type: "call" }) === "no" && gr(aa, { type: "allin" }) === "no", "AA: over-limping or shoving 100 bb is wrong");
+  ok(sp.villain != null && sp.rangePct > 0 && sp.rangePct < 1 && sp.lines.some(l => /isolation raise/.test(l)), "explains the isolation raise against the limper's range");
+  const p44 = spotLimp("4h 4d", "BTN", 1).A;
+  ok(p44.accept.call === "ok" && p44.accept.raise === "mid" && !p44.accept.fold && p44.best === "limp behind", "44 behind a limper: over-limp ok, raise mid, fold wrong");
+  ok(p44.lines.some(l => /over-limp/.test(l)), "44: says over-limp");
+  const s76 = spotLimp("7h 6h", "CO", 1).A;
+  ok(s76.accept.call === "ok" && s76.accept.fold === "mid", "76s behind a limper: over-limp ok, fold mid");
+  const k9 = spotLimp("Kh 9d", "BTN", 1), k9A = k9.A;
+  ok(T.OPENSET.BTN.has(PE.CLASSES.findIndex(c => c.name === "K9o")), "K9o is a button open when folded to");
+  ok(k9A.accept.fold === "ok" && !k9A.accept.call && k9A.best === "fold" && gr(k9, { type: "call" }) === "no", "K9o behind a limper: fold, the steal is gone");
+  const junk = spotLimp("7h 2d", "BTN", 1).A;
+  ok(junk.accept.fold === "ok" && Object.keys(junk.accept).length === 1, "72o behind a limper: fold only");
+  const sb = spotLimp("Qh Qd", "SB", 1).A;
+  ok(sb.spot === "limpers" && sb.accept.raise === "ok", "QQ in the small blind behind a limper: raise");
+  const open = spotLimp("Ah Ad", "BTN", 0).A;
+  ok(open.spot === "open", "folded to you on the button is still the open spot");
+}
+
 console.log(`table: ${tourneys} tournaments + ${cashHands} cash hands simulated`);
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

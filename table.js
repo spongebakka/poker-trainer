@@ -27,6 +27,14 @@
     BTN: "22+, A2s+, K2s+, Q4s+, J6s+, T6s+, 96s+, 85s+, 74s+, 64s+, 53s+, 43s, A2o+, K8o+, Q9o+, J9o+, T9o, 98o",
     SB: "22+, A2s+, K2s+, Q5s+, J7s+, T7s+, 96s+, 86s+, 75s+, 64s+, 54s, A2o+, K8o+, Q9o+, J9o+, T9o",
   };
+  // Simplified isolation-raise chart: raise over one or more limpers (bigger than an open). Not solver output.
+  const ISO = {
+    HJ: "77+, ATs+, KJs+, QJs, AJo+, KQo",
+    CO: "77+, A9s+, KTs+, QTs+, JTs, AJo+, KQo",
+    BTN: "66+, A8s+, K9s+, QTs+, JTs, ATo+, KJo+",
+    SB: "88+, ATs+, KJs+, AJo+, KQo",
+  };
+  const ISOSET = Object.fromEntries(Object.entries(ISO).map(([k, v]) => [k, PE.parseRange(v)]));
   const OPENSET = Object.fromEntries(Object.entries(OPEN).map(([k, v]) => [k, PE.parseRange(v)]));
   const OPENPCT = Object.fromEntries(Object.entries(OPENSET).map(([k, s]) => [k, PE.rangePct(s) / 100]));
   const POSN = { 2: ["BTN", "BB"], 3: ["BTN", "SB", "BB"], 4: ["BTN", "SB", "BB", "CO"], 5: ["BTN", "SB", "BB", "HJ", "CO"], 6: ["BTN", "SB", "BB", "UTG", "HJ", "CO"] };
@@ -60,13 +68,14 @@
 
   // ---------- bots ----------
   // Real table terms: nit (very tight), TAG (tight-aggressive, the solid style), LAG (loose-aggressive), calling station.
+  // limp: share of first-in hands (below the top quarter of their range) that just call the big blind instead of raising.
   const BOTS = [
     { name: "Rosa", tag: "nit", loose: 0.65, agg: 0.8, bluff: 0.35, sticky: 0.8 },
     { name: "Dev", tag: "TAG", loose: 1, agg: 1.1, bluff: 1, sticky: 1 },
-    { name: "Mick", tag: "LAG", loose: 1.6, agg: 1.4, bluff: 1.7, sticky: 1.05 },
-    { name: "June", tag: "calling station", loose: 1.5, agg: 0.55, bluff: 0.35, sticky: 1.7 },
+    { name: "Mick", tag: "LAG", loose: 1.6, agg: 1.4, bluff: 1.7, sticky: 1.05, limp: 0.2 },
+    { name: "June", tag: "calling station", loose: 1.5, agg: 0.55, bluff: 0.35, sticky: 1.7, limp: 0.8 },
     { name: "Theo", tag: "TAG", loose: 1.05, agg: 1.05, bluff: 1, sticky: 1 },
-    { name: "Ines", tag: "LAG", loose: 1.3, agg: 1.5, bluff: 1.4, sticky: 0.95 },
+    { name: "Ines", tag: "LAG", loose: 1.3, agg: 1.5, bluff: 1.4, sticky: 0.95, limp: 0.15 },
     { name: "Sal", tag: "nit", loose: 0.7, agg: 0.9, bluff: 0.5, sticky: 0.9 },
   ];
   const STYLE_LINE = {
@@ -249,6 +258,10 @@
       if (sit.toCall === 0) return pct < 0.07 * st.agg ? R(sit.curBet * 3 + sit.limpers * bb) : CHECK;
       if (sit.S <= 12) return pct < pushRange(sit.S, sit.behind) * st.loose ? ALLIN : FOLD;
       const thr = (sit.n === 2 ? 0.75 : OPENPCT[sit.pos] || 0.4) * st.loose;
+      if (st.limp) { // limpers: the top of the range still raises; the rest mostly just calls (open-limp, or over-limp behind others)
+        if (pct < thr && pct > thr * 0.25 && u < st.limp) return CALL;
+        if (pct >= thr && st.limp >= 0.5 && sit.limpers && pct < Math.min(0.85, thr * 1.3)) return CALL; // a station tags along wider when the pot's already multiway
+      }
       if (pct < thr) return R(((sit.pos === "SB" ? 3 : sit.S < 30 ? 2.2 : 2.5) + sit.limpers) * bb);
       return FOLD;
     }
@@ -411,6 +424,7 @@
   }
   const SKILLS = {
     open: { name: "Opening (first in)", drill: "open" },
+    vsLimp: { name: "Facing limpers", drill: "open" },
     shove: { name: "Short-stack all in or fold", drill: "shove" },
     vsRaise: { name: "Facing a raise", drill: "flip" },
     allin: { name: "Calling an all-in", drill: "callshove" },
@@ -491,6 +505,7 @@
             "Ranges are approximate (heads-up maths, shrunk for each extra player behind you)."];
           return A;
         }
+        if (sit.limpers) return limpSpot(H, A, sit, set, { s, me, cls, name, pct, S, pos, bb, L, ranges });
         A.spot = "open"; A.skill = "open";
         const chartPos = sit.n === 2 ? null : pos, inChart = chartPos ? OPENSET[chartPos] && OPENSET[chartPos].has(cls) : pct < 0.75;
         set(inChart ? ["raise"] : ["fold"], inChart ? ["call", S <= 25 ? "allin" : null].filter(Boolean) : []);
@@ -586,14 +601,66 @@
     A.lines.push("Counts this street only, against how this player actually responds.");
     return A;
   }
+  // Someone limped (called the big blind) and nobody has raised: isolation raise, over-limp, or fold.
+  function limpSpot(H, A, sit, set, c) {
+    const { s, me, cls, name, pct, S, pos, bb, L, ranges } = c, k = sit.limpers;
+    const C = PE.CLASSES[cls], pair = C.type === "p", suited = C.type === "s";
+    const limpers = H.order.filter(x => x !== s && x !== H.sbSeat && x !== H.bbSeat && !H.seats[x].folded && H.seats[x].acted && H.seats[x].bet === bb);
+    const v = limpers[0], vName = H.g.players[v].name, dead = new Set(me.cards);
+    let vRange = clean(H.seats[v].range || ALL, dead); if (!vRange.length) vRange = clean(ALL, dead);
+    A.spot = "limpers"; A.skill = "vsLimp"; A.limpers = k;
+    A.villain = v; A.range = rangeWeights(vRange); A.rangePct = rangeShare(vRange);
+    const isoPos = ISOSET[pos] ? pos : "BTN", iso = ISOSET[isoPos].has(cls);
+    const openPos = OPENSET[pos] ? pos : null, inOpen = openPos ? OPENSET[openPos].has(cls) : pct < 0.75;
+    // plays well in a cheap multiway pot: any pair, suited aces, suited broadways, suited connectors and one-gappers 5-4 and up
+    const playable = pair || (suited && (C.hi === 12 || C.lo >= 8 || (C.hi - C.lo <= 2 && C.lo >= 2)));
+    const deep = S >= 30;
+    const std = pos === "SB" ? 3 : S < 30 ? 2.2 : 2.5, target = (std + k) * bb;
+    const who = k === 1 ? `${vName} limped` : `${k} players limped`;
+    A.hint = `${who} in front of you: they just called the big blind instead of raising. Limpers usually hold medium hands they didn't want to raise. With ${name} on the ${POS_NAME[pos] || pos}, do you want to make it bigger, limp along cheaply, or let it go?`;
+    A.lines = [`A <b>limp</b> means calling the big blind instead of raising. ${vName} limps with about ${pc(A.rangePct)} of hands here, and has already said "not strong enough to raise".`];
+    const size = `<span class="m">${std} bb + ${k} bb = ${+(target / bb).toFixed(1)} bb</span>`;
+    if (iso) {
+      set(["raise"], [S <= 25 ? "allin" : null, (pair || suited) && pct > 0.05 ? "call" : null].filter(Boolean));
+      A.best = "raise";
+      A.gradeSize = to => (to >= target - 0.25 * bb ? "ok" : "mid");
+      const eq = eqVsRanges(me.cards, [], ranges, 2000); A.eq = eq;
+      A.lines.push(`${name} is strong enough to punish that: make an <b>isolation raise</b>. You win <b>${pc(eq)}</b> against ${k === 1 ? "what " + vName + " limps with" : "all the limpers' hands together"}.`,
+        `Raise bigger than a normal open: the standard size plus 1 bb for every limper, so ${size}. Limpers like to call, so a small raise doesn't get rid of anyone.`,
+        "The aim is a pot against one weak player, with the best hand and the lead. Just calling (an <b>over-limp</b>) lets everyone in cheaply and wastes your strong hand.");
+    } else if (playable && deep) {
+      set(["call"], [inOpen ? "raise" : null, suited ? "fold" : null].filter(Boolean));
+      A.best = "limp behind";
+      A.lines.push(pair
+        ? `Small pairs love a cheap pot with lots of players: you make a set about 1 time in 8, and a set wins big pots from limpers who hit top pair. Call along: an <b>over-limp</b> (also called <b>limping behind</b>).`
+        : `Suited hands like ${name} play well in big multiway pots: they make flushes and straights that win a lot. A cheap <b>over-limp</b> is fine.`,
+        `Raising isn't great: ${name} isn't strong enough for an <b>isolation raise</b>, and limpers often call, so you'd play a big pot with a medium hand.`,
+        "Over-limping works because it's cheap and the stacks are deep: you risk 1 bb to win a big pot when you hit (<b>implied odds</b>).");
+    } else if (playable) {
+      set(["fold"], ["call"]);
+      A.best = "fold";
+      A.lines.push(`${name} would be an <b>over-limp</b> with deep stacks, but at ${S.toFixed(0)} bb there isn't enough left behind to win when you hit (poor <b>implied odds</b>). <b>Fold</b> is best; a cheap call is not a big mistake.`);
+    } else if (inOpen) {
+      set(["fold"], ["raise"]);
+      A.best = "fold";
+      A.lines.push(`If everyone had folded, ${name} would be an open from the ${POS_NAME[pos] || pos}, but mostly because the blinds often fold (a <b>steal</b>). Now there's no steal: the limper usually calls, and ${C.type === "o" ? "offsuit hands like this are often <b>dominated</b> by the limper's A-x and K-x" : "this hand doesn't play well against several players"}.`,
+        `<b>Fold</b>. Don't limp behind with it either: a weak ${C.type === "o" ? "offsuit " : ""}hand in a multiway pot makes second-best hands that lose big pots.`);
+    } else {
+      set(["fold"]);
+      A.best = "fold";
+      A.lines.push(`${name} is too weak even for a cheap limp: <b>fold</b>. Paying 1 bb every time with hands like this adds up.`);
+    }
+    return A;
+  }
   function grade(H, A, a) {
     const k = kindOf(H, a), n = normalize(H, a);
     if (A.spot === "betCheck" && n.type === "raise" && A.gradeBet) return A.gradeBet(n.to);
+    if (A.gradeSize && k === "raise" && A.accept.raise === "ok") return A.gradeSize(n.to);
     const key = k === "allin-call" && !A.accept["allin-call"] ? "call" : k;
     if (A.accept[key]) return A.accept[key];
-    if (k === "allin" && A.accept.raise && A.spot !== "shove" && A.spot !== "open") return "mid";
+    if (k === "allin" && A.accept.raise && A.spot !== "shove" && A.spot !== "open" && A.spot !== "limpers") return "mid";
     return "no";
   }
 
-  return { PCT, OPEN, OPENSET, OPENPCT, POS_NAME, BOTS, STYLE_LINE, SKILLS, LEVELS, HPL, PAYOUT, CASH_BUYIN, tier, newGame, newHand, legal, normalize, act, botAction, situation, policy, coach, grade, potTotal, blindsFor, liveSeats, eqVsRanges, kindOf, seeded, clsOf };
+  return { PCT, OPEN, OPENSET, OPENPCT, ISO, ISOSET, POS_NAME, BOTS, STYLE_LINE, SKILLS, LEVELS, HPL, PAYOUT, CASH_BUYIN, tier, newGame, newHand, legal, normalize, act, botAction, situation, policy, coach, grade, potTotal, blindsFor, liveSeats, eqVsRanges, kindOf, seeded, clsOf };
 });

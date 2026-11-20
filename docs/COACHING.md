@@ -36,7 +36,7 @@ every action (seat, street, type, amount), board, showdown cards, result per sea
 tournament place if it ended.
 
 **decision** (each hero action at the table):
-hand id, street, spot (`open`/`shove`/`vsRaise`/`allin`/`facingBet`/`betCheck`), skill, pot, to call,
+hand id, street, spot (`open`/`option`/`limpers`/`shove`/`vsRaise`/`vs3bet`/`allin`/`facingBet`/`betCheck`), skill, limpers (count, `limpers` spot only), pot, to call,
 effective stack (bb), SPR, hand description ("top pair, weak kicker"), draw, villain style +
 range %, what he did (type + size), the coach's best and accepted set, grade, first or second try,
 equity, need %, EV per bet size (betCheck), **confidence (sure / guessing)**, **think time (ms)**,

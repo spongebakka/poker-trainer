@@ -941,7 +941,7 @@
       if (L.canRaise) {
         const nr = H.actions.filter(a => a.street === H.street && a.type === "raise").length, sizes = [];
         if (H.street === 0) {
-          if (nr === 0) { const S = me.stack / bb; sizes.push(L.toCall === 0 ? 3 * bb + H.curBet - bb : (me.pos === "SB" ? 3 : S < 30 ? 2.2 : 2.5) * bb); }
+          if (nr === 0) { const S = me.stack / bb, limpers = TBLX.situation(H, 0).limpers; sizes.push(L.toCall === 0 ? 3 * bb + H.curBet - bb : ((me.pos === "SB" ? 3 : S < 30 ? 2.2 : 2.5) + limpers) * bb); } // over limpers: +1 bb each (isolation raise)
           else sizes.push(H.curBet * (nr === 1 ? 3 : 2.3));
         } else if (L.toCall === 0) for (const f of [0.33, 0.66, 1]) sizes.push(Math.max(bb, Math.round(L.pot * f)));
         else sizes.push(H.curBet * 3);
@@ -1010,7 +1010,7 @@
       const vp = A.villain != null ? G.players[A.villain] : null, r3 = x => (x == null ? null : +(+x).toFixed(3));
       return COACH.rec("decision", {
         hand: H.key, game: G.key, mode: G.cash ? "cash" : "tourney", handNo: G.handNo, try: tries + 1,
-        street: ["preflop", "flop", "turn", "river"][H.street], spot: A.spot, skill: A.skill, pos: me.pos,
+        street: ["preflop", "flop", "turn", "river"][H.street], spot: A.spot, skill: A.skill, pos: me.pos, limpers: A.limpers || undefined,
         cards: cardsTxt(me.cards), cls: PE.CLASSES[TBLX.clsOf(me.cards[0], me.cards[1])].name, board: cardsTxt(H.board),
         made: tr ? tr.desc : null, draw: tr ? tr.draw : 0, bb, pot: L.pot, toCall: L.toCall,
         effBB: +(eff / bb).toFixed(1), spr: L.pot ? +(eff / L.pot).toFixed(2) : null,
@@ -1031,7 +1031,7 @@
       if (H.seats[0]) COACH.tally("hand:" + mode, 1);
     }
     function rangeBlock(A) {
-      if (!A.range || A.spot === "open" || A.spot === "shove" || A.spot === "option") return null;
+      if (!A.range || A.spot === "open" || A.spot === "shove" || A.spot === "option") return null; // "limpers" keeps it: it shows what the limper has
       const vn = G.players[A.villain].name;
       const g = gridEl(i => (A.range[i] > 0.001 ? "rg" : ""), { me: TBLX.clsOf(H.seats[0].cards[0], H.seats[0].cards[1]) });
       g.querySelectorAll(".c.rg").forEach(c => c.style.setProperty("--a", 0.45 + 0.55 * A.range[+c.dataset.i].toFixed(2)));
